@@ -7,21 +7,11 @@
   <title>Telegram</title>
   <script src="boot.js"></script>
   <link rel="stylesheet" href="wizard-tokens.css">
-  <link rel="stylesheet" href="wizard-ui.css">
-  <link rel="stylesheet" href="standalone.css">
   <link rel="stylesheet" href="styles.css">
   <script defer src="/wizard-os-home/core/app-client.js"></script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
-  <div class="wz-app">
-    <header class="wz-head"><h1>Telegram</h1></header>
-    <main class="wz-scroll">
-      <div class="wz-empty">
-        <div class="wz-tile" aria-hidden="true">✈</div>
-        <strong>Your chats, Telegram style</strong>
-        <p>Same conversations as Chats, with Telegram's look. Open it from the Chats picker or the launcher; your built-in Chats stays as it is.</p>
-      </div>
-    </main>
-  </div>
+  <div id="tg-root" class="tg-root"></div>
 </body>
 </html>

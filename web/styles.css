@@ -1,3 +1,34 @@
-/* Habit-specific styles only. Everything shared (type, rows, composer, colours) comes from wizard-ui.css. */
-.habit-progress { height: 3px; margin: 0 8px 6px; border-radius: 2px; background: var(--fill); overflow: hidden; }
-.habit-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width 260ms var(--ease); }
+/* Telegram as an app window: layout for the thread the page draws itself. Colours come from tg-view.js. */
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+.tg-root { position: fixed; inset: 0; display: flex; flex-direction: column; }
+.tg-root > .tg-wrap { flex: 1; min-height: 0; }
+.tg-off { margin: auto; max-width: 340px; padding: 24px; text-align: center; font: 15px/1.4 system-ui, sans-serif; color: var(--wz-text, #ddd); }
+.tg-off b { display: block; font-size: 17px; margin-bottom: 6px; }
+.ch-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ch-head { flex: none; display: flex; align-items: center; }
+.ch-head .ti { flex: 1; min-width: 0; display: flex; }
+.ch-head .ti b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ch-back { width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; cursor: pointer; }
+.ch-back svg { width: 24px; height: 24px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ch-msgs { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; overscroll-behavior: contain; }
+.msg { display: flex; }
+.msg.u { justify-content: flex-end; }
+.msg.pending .bub { opacity: .7; }
+.bub { word-wrap: break-word; overflow-wrap: anywhere; }
+.bub pre { overflow-x: auto; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; }
+.bub code { font-family: ui-monospace, Menlo, monospace; font-size: .92em; border-radius: 4px; padding: 0 3px; }
+.bub pre code { padding: 0; background: none; }
+.bub .mmeta { float: right; margin: 6px 0 -4px 10px; padding: 0 !important; line-height: 1; }
+.tg-day { align-self: center; margin: 6px 0; }
+.tg-day span { display: inline-block; padding: 3px 10px; border-radius: 12px; background: rgba(0,0,0,.28); color: #fff; font: 500 13px var(--tg-font, system-ui); }
+.tg-typing { display: flex; gap: 4px; padding: 12px 14px !important; }
+.tg-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--tg-sub, #999); animation: tg-dot 1.2s infinite ease-in-out; }
+.tg-typing i:nth-child(2) { animation-delay: .15s; } .tg-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes tg-dot { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+.tg-err { margin: 0; padding: 0 16px; color: var(--tg-danger, #e53935); font: 13px system-ui; }
+.tg-err:empty { display: none; }
+.ch-compose { flex: none; display: flex; align-items: flex-end; gap: 8px; margin: 0; }
+.ch-compose textarea { flex: 1; resize: none; outline: 0; box-sizing: border-box; max-height: 180px; }
+.ch-compose button { flex: none; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; }
+.ch-compose button svg { width: 22px; height: 22px; fill: currentColor; }
+.tg-view .tg-list { height: 100%; }

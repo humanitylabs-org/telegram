@@ -28,11 +28,7 @@ view:
     path: web
     build: python3 app/build_view.py
     dist: web
-provides:
-- chats
-chats_view:
-  contract: wizard.chats-view/1
-  module: chats/telegram.js
+provides: []
 system: false
 uses: []
 needs: []
@@ -44,4 +40,4 @@ switches:
 
 # Telegram
 
-A different look for the same Wizard chats: Telegram's chat list (folders, avatars, unread badges, archived chats, search) and Telegram-style message bubbles. It reads the same threads as Chats through the shell, keeps no messages of its own, and never changes the built-in Chats.
+A different look for the same Wizard chats: Telegram's chat list (folders, avatars, unread badges, archived chats, search) and Telegram-style message bubbles. It opens as a normal app window (desktop and phone) and reads the same threads as Chats through the shell, keeps no messages of its own, and never changes the built-in Chats.
