@@ -32,6 +32,16 @@ function md(text) {
     return h;
   }).join('');
 }
+// Machine markers the shell turns into chips; here they become a short note or disappear.
+function clean(text) {
+  return String(text || '')
+    .replace(/\[WIZARD_FILE_CHIPS_V1\][\s\S]*?\[\/WIZARD_FILE_CHIPS_V1\]/g, m => /audio\//.test(m) ? '🎤 Voice message' : '📎 File')
+    .replace(/\[WIZARD_FILES_V1\][\s\S]*?\[\/WIZARD_FILES_V1\]/g, m => /audio\//.test(m) ? '🎤 Voice message' : '📎 File')
+    .replace(/<helm_attachments>[\s\S]*?<\/helm_attachments>/g, '📎 Attachment')
+    .replace(/<memory-context>[\s\S]*?<\/memory-context>/g, '')
+    .replace(/\[WIZARD_STATUS_V1\][\s\S]*?\[\/WIZARD_STATUS_V1\]/g, '')
+    .trim();
+}
 function clock(ts) {
   const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
   return isFinite(d) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -99,7 +109,7 @@ function start() {
     try {
       const rows = await LIVE.messages(id);
       if (thread !== id) return;
-      msgs = rows.filter(m => (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim());
+      msgs = rows.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ ...m, content: clean(m.content) })).filter(m => m.content);
       const sig = msgs.length + ':' + (msgs.at(-1)?.id || '') + ':' + (LIVE.session(id)?.status || '');
       if (sig !== msgSig) { msgSig = sig; instance.update(); }
     } catch (e) { console.error(e); }

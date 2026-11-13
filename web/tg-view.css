@@ -1,0 +1,107 @@
+
+.tg-view { --tg-font: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", system-ui, sans-serif; }
+.tg-view[data-tg-theme="dark"] {
+  --tg-bg: #212121; --tg-head: #212121; --tg-text: #ffffff; --tg-sub: #aaaaaa; --tg-line: #303030;
+  --tg-primary: #8774e1; --tg-green: #00c73e; --tg-badge-muted: #5b5b5b; --tg-hover: #2c2c2c; --tg-search: #181818;
+  --tg-in: #212121; --tg-out: #766ac8; --tg-out-text: #ffffff; --tg-out-meta: rgba(255,255,255,.6); --tg-check: #ffffff;
+  --tg-wall: radial-gradient(circle at 18% 12%, rgba(118,92,214,.45), transparent 42%),
+             radial-gradient(circle at 88% 30%, rgba(42,130,150,.40), transparent 46%),
+             radial-gradient(circle at 75% 88%, rgba(80,110,60,.38), transparent 48%),
+             radial-gradient(circle at 10% 85%, rgba(140,70,140,.35), transparent 45%), #0f0f13;
+  --tg-compose: #212121; --tg-danger: #e53935;
+}
+.tg-view[data-tg-theme="light"] {
+  --tg-bg: #ffffff; --tg-head: #ffffff; --tg-text: #000000; --tg-sub: #707579; --tg-line: #dadce0;
+  --tg-primary: #3390ec; --tg-green: #4fae4e; --tg-badge-muted: #c4c9cc; --tg-hover: #f4f4f5; --tg-search: #f4f4f5;
+  --tg-in: #ffffff; --tg-out: #eeffde; --tg-out-text: #000000; --tg-out-meta: #4fae4e; --tg-check: #4fae4e;
+  --tg-wall: radial-gradient(circle at 15% 20%, #dbddbb, transparent 55%),
+             radial-gradient(circle at 85% 25%, #6ba587, transparent 55%),
+             radial-gradient(circle at 80% 85%, #d5d88d, transparent 55%),
+             radial-gradient(circle at 20% 80%, #88b884, transparent 55%), #b9cfa0;
+  --tg-compose: #ffffff; --tg-danger: #e53935;
+}
+
+/* ---------- chat list ---------- */
+.tg-list { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--tg-bg); color: var(--tg-text); font-family: var(--tg-font); }
+.tg-top { flex: none; display: flex; align-items: center; gap: 6px; padding: calc(var(--wos-cutout, 0px) + 8px) 10px 6px; }
+.tg-top h1 { flex: 1; margin: 0 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: .01em; }
+.tg-ibtn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--tg-sub); background: none; border: 0; cursor: pointer; }
+.tg-ibtn:active, .tg-ibtn:hover { background: var(--tg-hover); }
+.tg-ibtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tg-search { flex: none; margin: 0 10px 4px; position: relative; }
+.tg-search input { width: 100%; height: 42px; box-sizing: border-box; border-radius: 22px; border: 2px solid transparent; background: var(--tg-search); color: var(--tg-text);
+  padding: 0 14px 0 44px; font: 400 16px var(--tg-font); outline: 0; }
+.tg-search input:focus { border-color: var(--tg-primary); background: var(--tg-bg); }
+.tg-search input::placeholder { color: var(--tg-sub); }
+.tg-search svg { position: absolute; left: 14px; top: 11px; width: 20px; height: 20px; fill: none; stroke: var(--tg-sub); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.tg-tabs { flex: none; display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--tg-line); overflow-x: auto; scrollbar-width: none; }
+.tg-tabs::-webkit-scrollbar { display: none; }
+.tg-tab { position: relative; flex: none; padding: 12px 12px 11px; border: 0; background: none; color: var(--tg-sub); font: 500 15px var(--tg-font); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.tg-tab[aria-selected="true"] { color: var(--tg-primary); }
+.tg-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--tg-primary); }
+.tg-tab i { font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: var(--tg-badge-muted); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.tg-tab[aria-selected="true"] i { background: var(--tg-primary); }
+.tg-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 96px; scrollbar-width: none; }
+.tg-scroll::-webkit-scrollbar { display: none; }
+.tg-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 8px; border: 0; border-radius: 12px; background: none; color: inherit; text-align: left; cursor: pointer; font-family: var(--tg-font); }
+.tg-row:hover { background: var(--tg-hover); }
+.tg-row:active { background: var(--tg-hover); }
+.tg-av { flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 20px; font-weight: 600; letter-spacing: .02em; position: relative; }
+.tg-av.sm { width: 42px; height: 42px; font-size: 16px; }
+.tg-av.emo { font-size: 26px; }
+.tg-av.arch { background: var(--tg-badge-muted); }
+.tg-av.arch svg, .tg-av.saved svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tg-av.live::after { content: ""; position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 50%; background: var(--tg-green); border: 2.5px solid var(--tg-bg); }
+.tg-bd { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tg-l1, .tg-l2 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tg-l1 b { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-l1 time { flex: none; font-size: 12.5px; color: var(--tg-sub); }
+.tg-tick { flex: none; width: 18px; height: 14px; fill: none; stroke: var(--tg-green); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.tg-l2 span { flex: 1; min-width: 0; font-size: 15px; color: var(--tg-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-l2 span em { font-style: normal; color: var(--tg-primary); }
+.tg-l2 span strong { font-weight: 400; color: var(--tg-text); }
+.tg-badge { flex: none; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; background: var(--tg-green); }
+.tg-badge.dot { min-width: 12px; width: 12px; height: 12px; padding: 0; margin: 0 5px; }
+.tg-badge.at { background: var(--tg-primary); }
+.tg-badge.err { background: var(--tg-danger); }
+.tg-row.unread .tg-l1 b { font-weight: 700; }
+.tg-empty { padding: 60px 24px; text-align: center; color: var(--tg-sub); font: 400 15px/1.4 var(--tg-font); }
+.tg-empty b { display: block; margin-bottom: 4px; color: var(--tg-text); font-size: 17px; font-weight: 600; }
+.tg-fab { position: absolute; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--tg-primary); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; z-index: 2; }
+.tg-fab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tg-wrap { position: relative; height: 100%; min-height: 0; }
+
+/* ---------- thread: the standard Chats thread in Telegram dress ---------- */
+.tg-view.tg-view .ch-thread, .tg-view .ch-thread.ch-thread { background: var(--tg-wall); font-family: var(--tg-font); color: var(--tg-text); }
+.tg-view.tg-view .ch-head { background: var(--tg-head); border-bottom: 1px solid var(--tg-line); color: var(--tg-text); min-height: 56px; padding: 6px 8px 6px 4px; gap: 10px; }
+.tg-view.tg-view .ch-head .ch-back svg { stroke: var(--tg-sub); }
+.tg-view.tg-view .ch-head .ti { flex-direction: column; align-items: flex-start; justify-content: center; }
+.tg-view.tg-view .ch-head .ti b { font-size: 16px; font-weight: 600; color: var(--tg-text); }
+.tg-view.tg-view .ch-head .tg-sub { display: block; font-size: 13.5px; color: var(--tg-sub); line-height: 1.2; margin-top: 1px; }
+.tg-view.tg-view .ch-head .tg-sub.on { color: var(--tg-primary); }
+.tg-view.tg-view .ch-head .tg-av { width: 42px; height: 42px; font-size: 16px; }
+.tg-view.tg-view .ch-head .tg-av.emo { font-size: 22px; }
+.tg-view.tg-view .ch-head .tg-av.live::after { display: none; }
+.tg-view.tg-view .ch-msgs { gap: 6px; padding: 10px 10px 8px; }
+.tg-view.tg-view .msg .bub { position: relative; max-width: min(86%, 560px); padding: 7px 11px 8px; border-radius: 15px; font-size: 15.5px; line-height: 1.38;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18); border: 0; }
+.tg-view.tg-view .msg.a .bub { max-width: min(92%, 640px); background: var(--tg-in); color: var(--tg-text); border-bottom-left-radius: 4px; padding: 7px 11px 8px; }
+.tg-view.tg-view .msg.u .bub { background: var(--tg-out); color: var(--tg-out-text); border-bottom-right-radius: 4px; }
+.tg-view.tg-view .msg.u .bub a { color: inherit; text-decoration: underline; }
+.tg-view.tg-view .msg.a .bub a { color: var(--tg-primary); }
+.tg-view.tg-view .msg .bub code { background: rgba(127,127,127,.18); }
+.tg-view.tg-view .msg .bub pre { background: rgba(0,0,0,.22); }
+.tg-view.tg-view .msg .mmeta, .tg-view .msg .pmeta { font-size: 12px; color: var(--tg-sub); margin-top: 2px; padding: 0 4px; text-shadow: 0 0 6px rgba(0,0,0,.25); }
+.tg-view[data-tg-theme="light"] .msg .mmeta, .tg-view[data-tg-theme="light"] .msg .pmeta { color: rgba(0,0,0,.55); text-shadow: none; }
+.tg-view.tg-view .msg.u .mmeta { color: var(--tg-out-meta); }
+.tg-view[data-tg-theme="dark"] .msg.u .mmeta { color: rgba(255,255,255,.75); }
+.tg-view.tg-view .msg.u .mmeta time::after { content: " \2713\2713"; letter-spacing: -3px; margin-left: 2px; color: var(--tg-check); }
+.tg-view.tg-view .ch-compose { background: transparent; border-top: 0; padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+.tg-view.tg-view .ch-compose textarea { background: var(--tg-compose); color: var(--tg-text); border: 0; border-radius: 22px; min-height: 46px; padding: 12px 16px; font: 400 16px var(--tg-font);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.tg-view.tg-view .ch-compose textarea:focus { border: 0; }
+.tg-view.tg-view .ch-compose textarea::placeholder { color: var(--tg-sub); }
+.tg-view.tg-view .ch-compose button { width: 46px; height: 46px; background: var(--tg-primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.tg-view.tg-view .ch-compose .ch-attach { background: var(--tg-compose); border: 0; }
+.tg-view.tg-view .ch-compose .ch-attach svg { stroke: var(--tg-sub); }
