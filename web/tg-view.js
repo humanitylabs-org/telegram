@@ -62,7 +62,8 @@ const CSS = `
 .tg-row:active { background: var(--tg-hover); }
 .tg-av { flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 20px; font-weight: 600; letter-spacing: .02em; position: relative; }
 .tg-av.sm { width: 42px; height: 42px; font-size: 16px; }
-.tg-av.emo { font-size: 26px; }
+.tg-av.emo { font-size: 27px; line-height: 1; }
+.tg-av.sm.emo { font-size: 21px; }
 .tg-av.arch { background: var(--tg-badge-muted); }
 .tg-av.arch svg, .tg-av.saved svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tg-av.live::after { content: ""; position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 50%; background: var(--tg-green); border: 2.5px solid var(--tg-bg); }
@@ -156,10 +157,12 @@ function theme() {
   return /\blight\b/.test(scheme) && !/\bdark\b/.test(scheme) ? 'light' : 'dark';
 }
 function avatar(host, s, small) {
-  const a = host.element('span'), e = leadEmoji(s?.title), [c1, c2] = AVATARS[hash(s?.id || s?.title || '') % AVATARS.length];
-  a.className = 'tg-av' + (small ? ' sm' : '') + (e ? ' emo' : '');
-  a.style.background = `linear-gradient(180deg, ${c1}, ${c2})`;
-  a.textContent = e || initials(s?.title) || '·';
+  // A topic emoji on a soft tinted disc: the chat's subject at a glance, never a lone initial.
+  const a = host.element('span'), [c1] = AVATARS[hash(s?.id || s?.title || '') % AVATARS.length];
+  const e = leadEmoji(s?.title) || host.emoji?.(s) || '💬';
+  a.className = 'tg-av emo' + (small ? ' sm' : '');
+  a.style.background = `color-mix(in srgb, ${c1} 26%, transparent)`;
+  a.textContent = e;
   return a;
 }
 function isWorking(s) { return WORKING.has(String(s?.status || '')); }
