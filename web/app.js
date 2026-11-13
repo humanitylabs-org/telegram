@@ -72,7 +72,14 @@ function start() {
     isUnread: s => !!LIVE.isNew?.(s),
     emoji: s => { try { return P.WosTopicEmoji?.get(`thread:${s.id}`, [s.attention?.subject, s.title, s.preview].filter(Boolean).join(' ')); } catch (_) { return ''; } },
     openThread: id => open(id), back: () => close(), renderDefault: () => paintThread(),
-    element: tag => document.createElement(tag), listen,
+    // The window's CSP blocks <style> tags, so the view's stylesheet is adopted instead (no second copy shipped).
+    element: tag => {
+      const el = document.createElement(tag);
+      if (tag !== 'style') return el;
+      queueMicrotask(() => { try { const sh = new CSSStyleSheet(); sh.replaceSync(el.textContent); document.adoptedStyleSheets = [...document.adoptedStyleSheets, sh]; } catch (e) { console.error(e); } });
+      return el;
+    },
+    listen,
     subscribe: fn => LIVE.onChange(() => { try { fn(); } catch (e) { console.error(e); } }),
     onAppearance: fn => { const o = new MutationObserver(() => fn()); o.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-skin', 'data-color-scheme', 'class'] }); return () => o.disconnect(); },
     toast: (_i, text) => console.log(text),
