@@ -251,6 +251,8 @@ export default {
         const h = host.element('h1'); h.textContent = 'Archived Chats'; top.append(back, h);
       } else {
         const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
+        // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
+        if (c.archive) { const ab = host.element('button'); ab.type = 'button'; ab.className = 'tg-ibtn'; ab.dataset.tgArchive = ''; ab.title = 'Archived Chats'; ab.setAttribute('aria-label', 'Archived Chats'); ab.append(svg(host, ICON.archive)); top.append(ab); }
       }
       root.append(top);
       const sb = host.element('label'); sb.className = 'tg-search';
@@ -268,14 +270,6 @@ export default {
         root.append(tabs);
       }
       const sc = host.element('div'); sc.className = 'tg-scroll';
-      if (!inArchive && !query && folder === 'all' && c.archive) {
-        const a = host.element('button'); a.type = 'button'; a.className = 'tg-row'; a.dataset.tgArchive = '';
-        const av = host.element('span'); av.className = 'tg-av arch'; av.append(svg(host, ICON.archive));
-        const bd = host.element('span'); bd.className = 'tg-bd';
-        const l1 = host.element('span'); l1.className = 'tg-l1'; const b = host.element('b'); b.textContent = 'Archived Chats'; l1.append(b);
-        const l2 = host.element('span'); l2.className = 'tg-l2'; const p = host.element('span'); p.textContent = `${c.archive} chat${c.archive === 1 ? '' : 's'}`; l2.append(p);
-        bd.append(l1, l2); a.append(av, bd); sc.append(a);
-      }
       for (const s of rows) sc.append(row(s));
       if (!rows.length) {
         const e = host.element('div'); e.className = 'tg-empty'; const b = host.element('b');
