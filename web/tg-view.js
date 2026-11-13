@@ -172,7 +172,7 @@ function stamp(host, s) { try { return host.live?.cardAt?.(s) || s.updatedAt || 
 function archived(host, s) { try { return !!host.live?.inArchive?.(s); } catch (_) { return !!s.archived; } }
 
 export default {
-  contract: 'wizard.chats-view/1', id: 'telegram', name: 'Telegram',
+  contract: 'wizard.chats-view/1', id: 'telegram', name: 'Telegram Style',
   mount(el, host) {
     let folder = 'all', query = '', inArchive = false, sig = '', searchFocus = false;
     mounted++;
@@ -234,7 +234,7 @@ export default {
         const back = host.element('button'); back.type = 'button'; back.className = 'tg-ibtn'; back.dataset.tgArchiveBack = ''; back.setAttribute('aria-label', 'Back'); back.append(svg(host, ICON.back));
         const h = host.element('h1'); h.textContent = 'Archived Chats'; top.append(back, h);
       } else {
-        const h = host.element('h1'); h.textContent = 'Telegram'; top.append(h);
+        const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
       }
       root.append(top);
       const sb = host.element('label'); sb.className = 'tg-search';

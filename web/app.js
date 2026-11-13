@@ -53,6 +53,18 @@ function md(text) {
   try { if (KIT?.md) return KIT.md(text); } catch (_) {}
   return esc(text).replace(/\n/g, '<br>');
 }
+// Image lines (the helm's inline images and any same-origin Markdown image) become real pictures, not links.
+const IMG_LINE = /^[ \t]*!\[([^\]\n]*)\]\(\s*<?(\/(?![\/\\])[^\s)>]+)>?(?:\s+"[^"]*")?\s*\)[ \t]*$/;
+function rich(text) {
+  let out = '', buf = [];
+  const flush = () => { if (buf.length) { out += md(buf.join('\n')); buf = []; } };
+  for (const line of String(text).split('\n')) {
+    const m = line.match(IMG_LINE);
+    if (m) { flush(); out += `<a class="tg-img" href="${esc(m[2])}" target="_blank" rel="noopener"><img src="${esc(m[2])}" alt="${esc(m[1] || 'Image')}" loading="lazy"></a>`; }
+    else buf.push(line);
+  }
+  flush(); return out;
+}
 function fileHtml(f) {
   const mime = String(f.mime || '');
   if (mime.startsWith('image/')) return `<a class="tg-img" href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`;
@@ -307,8 +319,11 @@ function start() {
       const ext = /mp4|m4a|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm';
       const file = new File([out.blob], `wizard-voice-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`, { type });
       const f = await upload(file);
+      for (let i = 0; i < 120 && tray.some(t => t.uploading); i++) await new Promise(r => setTimeout(r, 250));
+      const extra = tray.map(t => t.id).filter(Boolean), sent = tray; tray = [];
       paintComposer();
-      await deliver((out.text || '').trim() || '🎤 Voice message', [f.id]);
+      try { await deliver((out.text || '').trim() || '🎤 Voice message', [f.id, ...extra]); }
+      catch (e) { tray = sent; paintTray(); throw e; }
     } catch (e) { paintComposer(); showErr(e.message || 'Voice note failed'); }
   }
 
@@ -349,7 +364,7 @@ function start() {
   /* ---------- painting ---------- */
   const ICON_BTN = '<svg viewBox="0 0 24 24" class="i-send"><path d="M4 12l16-8-6 16-2-7z"/></svg><svg viewBox="0 0 24 24" class="i-mic"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   function composerHtml(busy) {
-    if (rec) return `<div class="ch-compose tg-recbar"><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div>`;
+    if (rec) return `<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach a file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
     if (busy) return `<div class="ch-compose tg-recbar"><em class="tg-spin"></em><span class="tg-rec-hint">Sending voice message…</span></div>`;
     return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach a file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
   }
@@ -363,7 +378,7 @@ function start() {
     const text = strip(streamSnap?.text || ''), step = (streamSnap?.steps || []).filter(x => !x.done).at(-1);
     const stepLine = step ? `<span class="tg-step">⚙️ ${esc(String(step.tool).replace(/_/g, ' '))}…</span>` : '';
     if (!text) return `<div class="msg a tg-live"><div class="bub tg-typing">${stepLine}<span class="tg-dots"><i></i><i></i><i></i></span></div></div>`;
-    return `<div class="msg a tg-live"><div class="bub"><div class="tg-text">${md(text)}</div>${stepLine ? `<div>${stepLine}</div>` : ''}</div></div>`;
+    return `<div class="msg a tg-live"><div class="bub"><div class="tg-text">${rich(text)}</div>${stepLine ? `<div>${stepLine}</div>` : ''}</div></div>`;
   }
   function paintLive() {
     const m = root.querySelector('.ch-msgs'); if (!m) return;
@@ -389,13 +404,19 @@ function start() {
     if (ta0) draft = ta0.value;
     const answer = root.querySelector('.tg-ap-answer')?.value || '';
     let lastDay = '', body = '';
-    for (const m of msgs) {
+    const folded = new Set();
+    for (let i = 0; i < msgs.length; i++) if (msgs[i].role === 'assistant' && msgs[i + 1]?.role === 'assistant') folded.add(i);
+    let foldOpen = false;
+    for (let i = 0; i < msgs.length; i++) {
+      const m = msgs[i];
+      if (folded.has(i) && !folded.has(i - 1)) { let n = 0; while (folded.has(i + n)) n++; body += `<details class="tg-fold"><summary><span>${n} in-between ${n === 1 ? 'message' : 'messages'}</span></summary>`; foldOpen = true; }
       const d = day(m.timestamp); if (d && d !== lastDay) { body += `<div class="tg-day"><span>${esc(d)}</span></div>`; lastDay = d; }
       const u = m.role === 'user';
       const files = (m.files || []).map(fileHtml).join('');
       const hide = files && ['🎤 Voice message', '📎'].includes(m.text);
-      const text = m.text && !hide ? (u ? esc(m.text).replace(/\n/g, '<br>') : md(m.text)) : '';
+      const text = m.text && !hide ? (u ? esc(m.text).replace(/\n/g, '<br>') : rich(m.text)) : '';
       body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}"><div class="bub">${files}${text ? `<div class="tg-text">${text}</div>` : ''}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
+      if (foldOpen && !folded.has(i + 1)) { body += '</details>'; foldOpen = false; }
     }
     body += liveHtml();
     if (!body) body = thread === '__new__' ? '<div class="tg-day"><span>New chat with your Wizard</span></div>' : '<div class="tg-day"><span>Loading…</span></div>';
