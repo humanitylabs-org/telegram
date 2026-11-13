@@ -8,7 +8,7 @@ const AVATARS = [
   ['#ff885e', '#ff516a'], ['#ffcd6a', '#ffa85c'], ['#82b1ff', '#665fff'], ['#a0de7e', '#54cb68'],
   ['#53edd6', '#28c9b7'], ['#72d5fd', '#2a9ef1'], ['#e0a2f3', '#d669ed'],
 ];
-const FOLDERS = [['all', 'All chats'], ['unread', 'Unread'], ['working', 'Working']];
+const FOLDERS = [['all', 'All chats'], ['ready', 'Ready'], ['working', 'Working']];
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 let mounted = 0;
 
@@ -165,6 +165,11 @@ function avatar(host, s, small) {
   a.textContent = e;
   return a;
 }
+// Ready is the shell's own Ready (plus stopped chats); a simple stand-in when the shell's grouping is not reachable.
+function readyIds(host, rows) {
+  try { const g = host.live?.workGroups?.(rows); if (g) return new Set([...(g.ready || []), ...(g.errors || [])].map(s => s.id)); } catch (_) {}
+  return new Set(rows.filter(s => !isWorking(s) && !s.archived).map(s => s.id));
+}
 function isWorking(s) { return WORKING.has(String(s?.status || '')); }
 function needsYou(s) { return ['waiting_for_approval', 'unknown'].includes(s?.status) || s?.attention?.state === 'needs_you'; }
 function failed(s) { return s?.status === 'failed' || s?.status === 'interrupted'; }
@@ -186,7 +191,7 @@ export default {
     function pick() {
       const all = visible(), q = query.trim().toLowerCase();
       let rows = all.filter(s => archived(host, s) === inArchive);
-      if (!inArchive && folder === 'unread') rows = rows.filter(s => host.isUnread(s) || needsYou(s) || failed(s));
+      if (!inArchive && folder === 'ready') { const r = readyIds(host, rows); rows = rows.filter(s => r.has(s.id)); }
       if (!inArchive && folder === 'working') rows = rows.filter(isWorking);
       if (q) rows = all.filter(s => `${s.title || ''} ${s.preview || ''}`.toLowerCase().includes(q));
       const t = s => Date.parse(stamp(host, s)) || 0;
@@ -194,7 +199,8 @@ export default {
     }
     function counts() {
       const live = visible().filter(s => !archived(host, s));
-      return { unread: live.filter(s => host.isUnread(s) || needsYou(s) || failed(s)).length, working: live.filter(isWorking).length, archive: visible().length - live.length };
+      const r = readyIds(host, live);
+      return { ready: live.filter(s => r.has(s.id) && (host.isUnread(s) || needsYou(s) || failed(s))).length, working: live.filter(isWorking).length, archive: visible().length - live.length };
     }
 
     function row(s) {
@@ -245,7 +251,7 @@ export default {
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
           t.setAttribute('aria-selected', String(folder === id)); t.textContent = label;
-          const n = id === 'unread' ? c.unread : id === 'working' ? c.working : 0;
+          const n = id === 'ready' ? c.ready : id === 'working' ? c.working : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
         }
@@ -263,7 +269,7 @@ export default {
       for (const s of rows) sc.append(row(s));
       if (!rows.length) {
         const e = host.element('div'); e.className = 'tg-empty'; const b = host.element('b');
-        b.textContent = query ? 'No results' : folder === 'working' ? 'Nothing running' : folder === 'unread' ? 'All caught up' : 'No chats yet';
+        b.textContent = query ? 'No results' : folder === 'working' ? 'Nothing running' : folder === 'ready' ? 'All caught up' : 'No chats yet';
         e.append(b, query ? 'Try another word.' : 'Tap the pencil to start one.'); sc.append(e);
       }
       root.append(sc);
