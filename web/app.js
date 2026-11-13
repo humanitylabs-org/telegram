@@ -75,10 +75,14 @@ function fileHtml(f) {
 function start() {
   let thread = null, instance = null, msgs = [], msgSig = '', loading = false, sending = false, draft = '';
   let tray = [], stream = null, streamSnap = null, approval = null, apKey = '', rec = null, recT = null, menu = null;
+  // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
+  root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div>';
+  const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
+  const WIDE = matchMedia('(min-width: 760px)'), wide = () => WIDE.matches;
   const listen = (type, fn, target = root) => target.addEventListener(type, e => { try { fn(e); } catch (err) { console.error(err); } });
   const host = {
     contract: 'wizard.chats-view/1', windowId: 'telegram-app', region: 'main',
-    get thread() { return thread; },
+    get thread() { return wide() ? null : thread; },
     get threads() { return (LIVE.sessions || []).filter(s => !s.hidden && !LIVE.agentOf?.(s.id)); },
     live: LIVE,
     isUnread: s => !!LIVE.isNew?.(s),
@@ -96,8 +100,17 @@ function start() {
     onAppearance: fn => { const o = new MutationObserver(() => fn()); o.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-skin', 'data-color-scheme', 'class'] }); return () => o.disconnect(); },
     toast: (_i, text) => console.log(text),
   };
-  instance = view.mount(root, host);
-  instance.update();
+  instance = view.mount(listPane, host);
+  const markActive = () => { for (const r of listPane.querySelectorAll('[data-chopen]')) r.classList.toggle('tg-active', r.dataset.chopen === thread); };
+  new MutationObserver(markActive).observe(listPane, { childList: true, subtree: true });
+  const syncTheme = () => { if (listPane.dataset.tgTheme) threadPane.dataset.tgTheme = listPane.dataset.tgTheme; };
+  new MutationObserver(syncTheme).observe(listPane, { attributes: true, attributeFilter: ['data-tg-theme'] });
+  const show = () => { root.classList.toggle('tg-has-thread', !!thread); syncTheme(); instance.update(); if (thread) paintThread(); else paintEmpty(); markActive(); };
+  WIDE.addEventListener('change', show);
+  // Wizard routes Esc and the phone's back gesture to the app's Back: close the menu, then the open chat.
+  const registerBack = () => window.WizardApp?.back?.register?.({ canGoBack: () => !!(menu || thread), back: () => { if (menu) closeMenu(); else if (thread) close(); else return false; return true; } });
+  if (!registerBack()) addEventListener('load', registerBack, { once: true });
+  show();
 
   /* ---------- events ---------- */
   listen('click', e => {
@@ -159,9 +172,10 @@ function start() {
     closeMenu(); unfollow();
     thread = id; msgs = []; msgSig = ''; draft = ''; tray = []; approval = null; apKey = '';
     if (id !== '__new__') { try { LIVE.markSeen?.(id); } catch (_) {} load(); follow(); checkApproval(); }
-    instance.update(); focusComposer();
+    show(); focusComposer();
   }
-  function close() { recCancel(); unfollow(); thread = null; msgs = []; msgSig = ''; approval = null; instance.update(); }
+  function close() { recCancel(); unfollow(); thread = null; msgs = []; msgSig = ''; approval = null; show(); }
+  function paintEmpty() { threadPane.innerHTML = '<div class="ch-thread tg-none"><div class="tg-day"><span>Select a chat to start messaging</span></div></div>'; }
   async function load() {
     if (loading || !thread || thread === '__new__') return;
     loading = true; const id = thread;
@@ -422,7 +436,8 @@ function start() {
     if (!body) body = thread === '__new__' ? '<div class="tg-day"><span>New chat with your Wizard</span></div>' : '<div class="tg-day"><span>Loading…</span></div>';
     const working = s && WORKING.has(s.status);
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
-    root.innerHTML = `<div class="ch-thread">
+    syncTheme();
+    threadPane.innerHTML = `<div class="ch-thread">
       <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(s?.title || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
       <div class="ch-msgs">${body}</div>
       ${approvalHtml()}

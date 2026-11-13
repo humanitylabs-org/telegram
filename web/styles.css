@@ -1,7 +1,18 @@
 /* Telegram as an app window: layout for the thread the page draws itself. Colours come from tg-view.js. */
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-.tg-root { position: fixed; inset: 0; display: flex; flex-direction: column; }
-.tg-root > .tg-wrap { flex: 1; min-height: 0; }
+.tg-root { position: fixed; inset: 0; display: flex; }
+.tg-pane-list, .tg-pane-thread { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tg-pane-list > .tg-wrap { flex: 1; min-height: 0; }
+.tg-pane-thread { display: none; }
+.tg-root.tg-has-thread .tg-pane-list { display: none; }
+.tg-root.tg-has-thread .tg-pane-thread { display: flex; }
+.tg-none { justify-content: center; align-items: center; }
+@media (min-width: 760px) {
+  .tg-root.tg-root .tg-pane-list { display: flex; flex: 0 0 clamp(300px, 34%, 420px); border-right: 1px solid var(--tg-line, #303030); }
+  .tg-root .tg-pane-thread { display: flex; }
+}
+.tg-row.tg-row.tg-active { background: var(--tg-primary); color: #fff; }
+.tg-row.tg-row.tg-active .tg-l1 time, .tg-row.tg-row.tg-active .tg-l2 span, .tg-row.tg-row.tg-active .tg-l2 span em, .tg-row.tg-row.tg-active .tg-l2 span strong { color: #fff; }
 .tg-off { margin: auto; max-width: 340px; padding: 24px; text-align: center; font: 15px/1.4 system-ui, sans-serif; color: var(--wz-text, #ddd); }
 .tg-off b { display: block; font-size: 17px; margin-bottom: 6px; }
 .ch-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
