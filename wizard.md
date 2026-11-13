@@ -28,11 +28,7 @@ view:
     path: web
     build: python3 app/build_view.py
     dist: web
-provides:
-- chats
-chats_view:
-  contract: wizard.chats-view/1
-  module: web/tg-view.js
+provides: []
 system: false
 uses: []
 needs: []
