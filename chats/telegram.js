@@ -18,9 +18,10 @@ const CSS = `
   --tg-bg: #212121; --tg-head: #212121; --tg-text: #ffffff; --tg-sub: #aaaaaa; --tg-line: #303030;
   --tg-primary: #8774e1; --tg-green: #00c73e; --tg-badge-muted: #5b5b5b; --tg-hover: #2c2c2c; --tg-search: #181818;
   --tg-in: #212121; --tg-out: #766ac8; --tg-out-text: #ffffff; --tg-out-meta: rgba(255,255,255,.6); --tg-check: #ffffff;
-  --tg-wall: radial-gradient(circle at 20% 15%, rgba(104,79,180,.28), transparent 45%),
-             radial-gradient(circle at 85% 80%, rgba(46,108,120,.30), transparent 50%),
-             linear-gradient(160deg, #10151d, #0f0f0f 60%, #141a12);
+  --tg-wall: radial-gradient(circle at 18% 12%, rgba(118,92,214,.45), transparent 42%),
+             radial-gradient(circle at 88% 30%, rgba(42,130,150,.40), transparent 46%),
+             radial-gradient(circle at 75% 88%, rgba(80,110,60,.38), transparent 48%),
+             radial-gradient(circle at 10% 85%, rgba(140,70,140,.35), transparent 45%), #0f0f13;
   --tg-compose: #212121; --tg-danger: #e53935;
 }
 .tg-view[data-tg-theme="light"] {
@@ -86,38 +87,38 @@ const CSS = `
 .tg-wrap { position: relative; height: 100%; min-height: 0; }
 
 /* ---------- thread: the standard Chats thread in Telegram dress ---------- */
-.tg-view .ch-thread { background: var(--tg-wall) !important; background-attachment: fixed; font-family: var(--tg-font); color: var(--tg-text); }
-.tg-view .ch-head { background: var(--tg-head); border-bottom: 1px solid var(--tg-line); color: var(--tg-text); min-height: 56px; padding: 6px 8px 6px 4px; gap: 10px; }
-.tg-view .ch-head .ch-back svg { stroke: var(--tg-sub); }
-.tg-view .ch-head .ti { flex-direction: column; align-items: flex-start; justify-content: center; }
-.tg-view .ch-head .ti b { font-size: 16px; font-weight: 600; color: var(--tg-text); }
-.tg-view .ch-head .tg-sub { display: block; font-size: 13.5px; color: var(--tg-sub); line-height: 1.2; margin-top: 1px; }
-.tg-view .ch-head .tg-sub.on { color: var(--tg-primary); }
-.tg-view .ch-head .tg-av { width: 42px; height: 42px; font-size: 16px; }
-.tg-view .ch-head .tg-av.emo { font-size: 22px; }
-.tg-view .ch-head .tg-av.live::after { display: none; }
-.tg-view .ch-msgs { gap: 6px; padding: 10px 10px 8px; }
-.tg-view .msg .bub { position: relative; max-width: min(86%, 560px); padding: 7px 11px 8px; border-radius: 15px; font-size: 15.5px; line-height: 1.38;
+.tg-view.tg-view .ch-thread, .tg-view .ch-thread.ch-thread { background: var(--tg-wall); font-family: var(--tg-font); color: var(--tg-text); }
+.tg-view.tg-view .ch-head { background: var(--tg-head); border-bottom: 1px solid var(--tg-line); color: var(--tg-text); min-height: 56px; padding: 6px 8px 6px 4px; gap: 10px; }
+.tg-view.tg-view .ch-head .ch-back svg { stroke: var(--tg-sub); }
+.tg-view.tg-view .ch-head .ti { flex-direction: column; align-items: flex-start; justify-content: center; }
+.tg-view.tg-view .ch-head .ti b { font-size: 16px; font-weight: 600; color: var(--tg-text); }
+.tg-view.tg-view .ch-head .tg-sub { display: block; font-size: 13.5px; color: var(--tg-sub); line-height: 1.2; margin-top: 1px; }
+.tg-view.tg-view .ch-head .tg-sub.on { color: var(--tg-primary); }
+.tg-view.tg-view .ch-head .tg-av { width: 42px; height: 42px; font-size: 16px; }
+.tg-view.tg-view .ch-head .tg-av.emo { font-size: 22px; }
+.tg-view.tg-view .ch-head .tg-av.live::after { display: none; }
+.tg-view.tg-view .ch-msgs { gap: 6px; padding: 10px 10px 8px; }
+.tg-view.tg-view .msg .bub { position: relative; max-width: min(86%, 560px); padding: 7px 11px 8px; border-radius: 15px; font-size: 15.5px; line-height: 1.38;
   box-shadow: 0 1px 2px rgba(0,0,0,.18); border: 0; }
-.tg-view .msg.a .bub { max-width: min(92%, 640px); background: var(--tg-in); color: var(--tg-text); border-bottom-left-radius: 4px; padding: 7px 11px 8px; }
-.tg-view .msg.u .bub { background: var(--tg-out); color: var(--tg-out-text); border-bottom-right-radius: 4px; }
-.tg-view .msg.u .bub a { color: inherit; text-decoration: underline; }
-.tg-view .msg.a .bub a { color: var(--tg-primary); }
-.tg-view .msg .bub code { background: rgba(127,127,127,.18); }
-.tg-view .msg .bub pre { background: rgba(0,0,0,.22); }
-.tg-view .msg .mmeta, .tg-view .msg .pmeta { font-size: 12px; color: var(--tg-sub); margin-top: 2px; padding: 0 4px; text-shadow: 0 0 6px rgba(0,0,0,.25); }
+.tg-view.tg-view .msg.a .bub { max-width: min(92%, 640px); background: var(--tg-in); color: var(--tg-text); border-bottom-left-radius: 4px; padding: 7px 11px 8px; }
+.tg-view.tg-view .msg.u .bub { background: var(--tg-out); color: var(--tg-out-text); border-bottom-right-radius: 4px; }
+.tg-view.tg-view .msg.u .bub a { color: inherit; text-decoration: underline; }
+.tg-view.tg-view .msg.a .bub a { color: var(--tg-primary); }
+.tg-view.tg-view .msg .bub code { background: rgba(127,127,127,.18); }
+.tg-view.tg-view .msg .bub pre { background: rgba(0,0,0,.22); }
+.tg-view.tg-view .msg .mmeta, .tg-view .msg .pmeta { font-size: 12px; color: var(--tg-sub); margin-top: 2px; padding: 0 4px; text-shadow: 0 0 6px rgba(0,0,0,.25); }
 .tg-view[data-tg-theme="light"] .msg .mmeta, .tg-view[data-tg-theme="light"] .msg .pmeta { color: rgba(0,0,0,.55); text-shadow: none; }
-.tg-view .msg.u .mmeta { color: var(--tg-out-meta); }
+.tg-view.tg-view .msg.u .mmeta { color: var(--tg-out-meta); }
 .tg-view[data-tg-theme="dark"] .msg.u .mmeta { color: rgba(255,255,255,.75); }
-.tg-view .msg.u .mmeta time::after { content: " \\2713\\2713"; letter-spacing: -3px; margin-left: 2px; color: var(--tg-check); }
-.tg-view .ch-compose { background: transparent; border-top: 0; padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
-.tg-view .ch-compose textarea { background: var(--tg-compose); color: var(--tg-text); border: 0; border-radius: 22px; min-height: 46px; padding: 12px 16px; font: 400 16px var(--tg-font);
+.tg-view.tg-view .msg.u .mmeta time::after { content: " \\2713\\2713"; letter-spacing: -3px; margin-left: 2px; color: var(--tg-check); }
+.tg-view.tg-view .ch-compose { background: transparent; border-top: 0; padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+.tg-view.tg-view .ch-compose textarea { background: var(--tg-compose); color: var(--tg-text); border: 0; border-radius: 22px; min-height: 46px; padding: 12px 16px; font: 400 16px var(--tg-font);
   box-shadow: 0 1px 2px rgba(0,0,0,.18); }
-.tg-view .ch-compose textarea:focus { border: 0; }
-.tg-view .ch-compose textarea::placeholder { color: var(--tg-sub); }
-.tg-view .ch-compose button { width: 46px; height: 46px; background: var(--tg-primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
-.tg-view .ch-compose .ch-attach { background: var(--tg-compose); border: 0; }
-.tg-view .ch-compose .ch-attach svg { stroke: var(--tg-sub); }
+.tg-view.tg-view .ch-compose textarea:focus { border: 0; }
+.tg-view.tg-view .ch-compose textarea::placeholder { color: var(--tg-sub); }
+.tg-view.tg-view .ch-compose button { width: 46px; height: 46px; background: var(--tg-primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.tg-view.tg-view .ch-compose .ch-attach { background: var(--tg-compose); border: 0; }
+.tg-view.tg-view .ch-compose .ch-attach svg { stroke: var(--tg-sub); }
 `;
 
 const esc = s => String(s ?? '');
@@ -150,12 +151,9 @@ const ICON = {
   tick2: ['M2 13l4 4 8-9', 'M10 15l2 2 8-9'],
 };
 function theme() {
-  // Follow the shell: light skins get Telegram's day theme, everything else its night theme.
-  const scheme = document.documentElement.getAttribute('data-color-scheme');
-  if (scheme === 'light' || scheme === 'dark') return scheme;
-  const bg = getComputedStyle(document.body).backgroundColor.match(/\d+(\.\d+)?/g);
-  if (bg && bg.length >= 3 && (bg.length < 4 || +bg[3] > 0.5)) { const [r, g, b] = bg.map(Number); if ((r * 299 + g * 587 + b * 114) / 1000 > 150) return 'light'; }
-  return 'dark';
+  // Follow the shell, the same way its Appearance host decides: light skins get Telegram's day theme.
+  const scheme = (getComputedStyle(document.documentElement).colorScheme || '').trim();
+  return /\blight\b/.test(scheme) && !/\bdark\b/.test(scheme) ? 'light' : 'dark';
 }
 function avatar(host, s, small) {
   const a = host.element('span'), e = leadEmoji(s?.title), [c1, c2] = AVATARS[hash(s?.id || s?.title || '') % AVATARS.length];
