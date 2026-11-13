@@ -4,7 +4,7 @@ id: telegram
 name: Telegram Style
 type: service
 category: app
-version: 0.2.0
+version: 0.3.0
 summary: Your Wizard chats with Telegram's look.
 license: GPL-3.0-only
 source: https://github.com/oscarhenrycollins/telegram
@@ -28,7 +28,11 @@ view:
     path: web
     build: python3 app/build_view.py
     dist: web
-provides: []
+provides:
+- chats
+chats_view:
+  contract: wizard.chats-view/1
+  module: web/tg-view.js
 system: false
 uses: []
 needs: []

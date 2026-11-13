@@ -86,6 +86,16 @@ const CSS = `
   background: var(--tg-primary); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; z-index: 2; }
 .tg-fab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tg-wrap { position: relative; height: 100%; min-height: 0; }
+/* Collapsed: a narrow list shows avatars only, with their badges, like Telegram Desktop's folded chat column. */
+.tg-wrap { container-type: inline-size; }
+@container (max-width: 150px) {
+  .tg-top h1, .tg-search, .tg-tabs, .tg-bd, .tg-fab, .tg-empty { display: none; }
+  .tg-top { justify-content: center; padding-left: 0; padding-right: 0; }
+  .tg-scroll { padding: 4px 4px 24px; }
+  .tg-row { justify-content: center; padding: 6px 0; position: relative; }
+  .tg-row .tg-av { width: 48px; height: 48px; }
+  .tg-row.unread .tg-av::before { content: ""; position: absolute; top: 0; right: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--tg-primary); box-shadow: 0 0 0 2px var(--tg-bg); }
+}
 
 /* ---------- thread: the standard Chats thread in Telegram dress ---------- */
 .tg-view.tg-view .ch-thread, .tg-view .ch-thread.ch-thread { background: var(--tg-wall); font-family: var(--tg-font); color: var(--tg-text); }
