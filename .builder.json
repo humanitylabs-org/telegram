@@ -1,0 +1,8 @@
+{
+  "request": "Your Wizard chats in a Telegram-style look",
+  "template": "hello-wizard",
+  "kind": "hello",
+  "rules": 2,
+  "state": "local_draft",
+  "name": "Telegram"
+}

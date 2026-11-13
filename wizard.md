@@ -1,0 +1,47 @@
+---
+wizard: 0.2
+id: telegram
+name: Telegram
+type: service
+category: app
+version: 0.2.0
+summary: Your Wizard chats with Telegram's look.
+license: GPL-3.0-only
+source: https://github.com/oscarhenrycollins/telegram
+runtime:
+  kind: runtipi
+  config: runtipi/config.json
+  compose: runtipi/docker-compose.yml
+api:
+  port: 8799
+  path: /api
+  spec: openapi.json
+mcp:
+  path: /mcp
+  port: 8799
+  transport: streamable-http
+skill: skill/SKILL.md
+view:
+  path: /
+  port: 8799
+  source:
+    path: web
+    build: python3 app/build_view.py
+    dist: web
+provides:
+- chats
+chats_view:
+  contract: wizard.chats-view/1
+  module: chats/telegram.js
+system: false
+uses: []
+needs: []
+health: /healthz
+switches:
+  contract: wizard.app-switches/1
+  path: /api/switches
+---
+
+# Telegram
+
+A different look for the same Wizard chats: Telegram's chat list (folders, avatars, unread badges, archived chats, search) and Telegram-style message bubbles. It reads the same threads as Chats through the shell, keeps no messages of its own, and never changes the built-in Chats.
