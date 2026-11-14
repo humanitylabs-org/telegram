@@ -72,6 +72,30 @@ function fileHtml(f) {
   return `<a class="tg-file" href="${esc(f.url)}" target="_blank" rel="noopener"><i>📄</i><span>${esc(f.name)}</span></a>`;
 }
 
+// What the chat is about, from its title (then subject): a small fixed list, first match wins.
+function topics() { return [
+  [/telegram/, '📨'], [/messenger|whatsapp|\bline\b|chat/, '💬'], [/mail|inbox|email/, '✉️'],
+  [/notes?\b|obsidian|wisdom/, '📝'], [/calendar|schedul|meeting/, '📅'], [/vespa|scooter|motorbike|mechanic/, '🛵'],
+  [/car\b|car-rental|rental|drive/, '🚗'], [/apartment|condo|house|rent\b|viewing|home\b/, '🏢'],
+  [/visa|passport|immigration|embassy/, '🛂'], [/trip|travel|flight|tokyo|japan/, '✈️'],
+  [/money|bank|budget|finance|card|tax|invoice|pay/, '💰'], [/health|whoop|oura|sleep|garmin|fitbit|workout|gym/, '❤️'],
+  [/music|spotify|playlist/, '🎵'], [/podcast/, '🎙️'], [/video|defleur|movie|film|youtube/, '🎬'],
+  [/news/, '📰'], [/backup|storage|disk/, '💾'], [/wingman|student|course|academy|teach/, '🎓'],
+  [/sniper|kakao|scan/, '🎯'], [/marketplace|second.?hand|sell|buy|shop|lazada|grab/, '🛍️'],
+  [/food|usuals|restaurant|meal/, '🍜'], [/smart home|home assistant|lights?\b/, '💡'],
+  [/contact|crm|carlos|client|customer/, '👥'], [/tracker|board|builder|pipeline|release/, '📋'],
+  [/phone|android|iphone|pixel/, '📱'], [/voice|transcri|dictation/, '🎤'], [/search|research/, '🔎'],
+  [/browser|web\b|website|cloudflare|domain/, '🌐'], [/security|secret|password|key\b/, '🔐'],
+  [/wizard|desktop|app\b|apps\b|skin|look/, '🧙'],
+]; }
+function topicEmoji(s) {
+  for (const src of [s?.title, s?.attention?.subject]) {
+    const t = String(src || '').toLowerCase(); if (!t) continue;
+    for (const [re, e] of topics()) if (re.test(t)) return e;
+  }
+  return '';
+}
+
 function makeNotes() {
   let items = [], busy = false; const subs = new Set();
   const emit = () => { for (const fn of [...subs]) { try { fn(items); } catch (e) { console.error(e); } } };
@@ -128,7 +152,7 @@ function start() {
     get threads() { return (LIVE.sessions || []).filter(s => !s.hidden && !LIVE.agentOf?.(s.id)); },
     live: LIVE,
     isUnread: s => !!LIVE.isNew?.(s),
-    emoji: s => { try { return P.WosTopicEmoji?.get(`thread:${s.id}`, [s.attention?.subject, s.title, s.preview].filter(Boolean).join(' ')); } catch (_) { return ''; } },
+    emoji: s => topicEmoji(s) || (() => { try { return P.WosTopicEmoji?.get(`thread:${s.id}`, [s.attention?.subject, s.title, s.preview].filter(Boolean).join(' ')); } catch (_) { return ''; } })(),
     openThread: id => open(id), back: () => close(), renderDefault: () => paintThread(),
     // The window's CSP blocks <style> tags, so the view's stylesheet is adopted instead (no second copy shipped).
     element: tag => {
@@ -349,7 +373,7 @@ function start() {
     for (const file of files) {
       const t = { key: Math.random().toString(36).slice(2), name: file.name, mime: file.type, uploading: true, preview: /^image\//.test(file.type) ? URL.createObjectURL(file) : '' };
       tray.push(t);
-      upload(file).then(f => { Object.assign(t, f, { uploading: false }); paintTray(); syncSend(); },
+      upload(file).then(f => { Object.assign(t, f, { uploading: false }); if (/^image\//.test(file.type) && f.id) t.preview = `/wizard/files/${encodeURIComponent(f.id)}/content`; paintTray(); syncSend(); },
         e => { tray = tray.filter(x => x !== t); paintTray(); syncSend(); showErr(e.message || 'Upload failed'); });
     }
     paintTray(); syncSend();

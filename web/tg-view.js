@@ -49,12 +49,13 @@ const CSS = `
 .tg-search input:focus { border-color: var(--tg-primary); background: var(--tg-bg); }
 .tg-search input::placeholder { color: var(--tg-sub); }
 .tg-search svg { position: absolute; left: 14px; top: 11px; width: 20px; height: 20px; fill: none; stroke: var(--tg-sub); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
-.tg-tabs { flex: none; display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--tg-line); overflow-x: auto; scrollbar-width: none; }
+.tg-tabs { flex: none; display: flex; gap: 0; padding: 0 4px; border-bottom: 1px solid var(--tg-line); overflow-x: auto; scrollbar-width: none; }
 .tg-tabs::-webkit-scrollbar { display: none; }
-.tg-tab { position: relative; flex: none; padding: 12px 12px 11px; border: 0; background: none; color: var(--tg-sub); font: 500 15px var(--tg-font); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.tg-tab { position: relative; flex: 0 1 auto; min-width: 0; padding: 10px 6px 9px; border: 0; background: none; color: var(--tg-sub); font: 500 13.5px var(--tg-font); cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.tg-tab span { overflow: hidden; text-overflow: ellipsis; }
 .tg-tab[aria-selected="true"] { color: var(--tg-primary); }
-.tg-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--tg-primary); }
-.tg-tab i { font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: var(--tg-badge-muted); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.tg-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--tg-primary); }
+.tg-tab i { font-style: normal; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 10px; background: var(--tg-badge-muted); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
 .tg-tab[aria-selected="true"] i { background: var(--tg-primary); }
 .tg-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 96px; scrollbar-width: none; }
 .tg-scroll::-webkit-scrollbar { display: none; }
@@ -141,6 +142,8 @@ function initials(title) {
   if (!words.length) return '';
   return (words[0][0] + (words[1]?.[0] || '')).toUpperCase();
 }
+// The agent service dates a title that clashes with another chat's ("Vespa (14 Nov)"); Telegram shows the plain name.
+export function cleanTitle(t) { return String(t || '').replace(/\s*\(\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?: \d{1,2}:\d{2})?(?: [^)]{1,12})?\)\s*$/, ''); }
 function leadEmoji(title) { const m = String(title || '').match(/^\s*(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u); return m ? m[1] : ''; }
 function when(iso) {
   const t = Date.parse(iso || ''); if (!isFinite(t)) return '';
@@ -242,7 +245,7 @@ export default {
       const av = avatar(host, s); if (working) av.classList.add('live');
       const bd = host.element('span'); bd.className = 'tg-bd';
       const l1 = host.element('span'); l1.className = 'tg-l1';
-      const name = host.element('b'); name.textContent = s.title || 'New chat';
+      const name = host.element('b'); name.textContent = cleanTitle(s.title) || 'New chat';
       l1.append(name);
       if (working) l1.append(svg(host, ICON.tick2, 'tg-tick'));
       const time = host.element('time'); time.textContent = when(stamp(host, s)); l1.append(time);
@@ -283,7 +286,7 @@ export default {
         const tabs = host.element('div'); tabs.className = 'tg-tabs'; tabs.setAttribute('role', 'tablist');
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
-          t.setAttribute('aria-selected', String(folder === id)); t.textContent = label;
+          t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
           const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
