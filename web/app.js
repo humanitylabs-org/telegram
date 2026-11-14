@@ -1,7 +1,7 @@
 // Telegram as a normal app window. The chat list is tg-view.js; threads, sending, uploads, voice, live replies and
 // approvals all go through the shell's own engine on the parent page (same origin), so this page keeps no
 // messages, tokens or model logic of its own.
-import view from './tg-view.js';
+import view, { cleanTitle } from './tg-view.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -534,7 +534,7 @@ function start() {
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
     syncTheme();
     threadPane.innerHTML = `<div class="ch-thread">
-      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(s?.title || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
+      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
       <div class="ch-msgs">${body}</div>
       ${approvalHtml()}
       <p class="tg-err" role="status"></p>
