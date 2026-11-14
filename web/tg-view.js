@@ -8,7 +8,8 @@ const AVATARS = [
   ['#ff885e', '#ff516a'], ['#ffcd6a', '#ffa85c'], ['#82b1ff', '#665fff'], ['#a0de7e', '#54cb68'],
   ['#53edd6', '#28c9b7'], ['#72d5fd', '#2a9ef1'], ['#e0a2f3', '#d669ed'],
 ];
-const FOLDERS = [['all', 'All chats'], ['ready', 'Ready'], ['working', 'Working']];
+// Every chat is Ready or Working; the shell's notifications have their own tab (Miguel, 14 Nov 2026: no All chats).
+const FOLDERS = [['ready', 'Ready'], ['working', 'Working'], ['notes', 'Notifications']];
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 let mounted = 0;
 
@@ -80,6 +81,7 @@ const CSS = `
 .tg-badge.at { background: var(--tg-primary); }
 .tg-badge.err { background: var(--tg-danger); }
 .tg-row.unread .tg-l1 b { font-weight: 700; }
+.tg-note-av { background: color-mix(in srgb, #f5b82e 30%, transparent); }
 .tg-empty { padding: 60px 24px; text-align: center; color: var(--tg-sub); font: 400 15px/1.4 var(--tg-font); }
 .tg-empty b { display: block; margin-bottom: 4px; color: var(--tg-text); font-size: 17px; font-weight: 600; }
 .tg-fab { position: absolute; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
@@ -175,11 +177,11 @@ function avatar(host, s, small) {
   a.textContent = e;
   return a;
 }
-// Ready is the shell's own Ready (plus stopped chats); a simple stand-in when the shell's grouping is not reachable.
-function readyIds(host, rows) {
-  try { const g = host.live?.workGroups?.(rows); if (g) return new Set([...(g.ready || []), ...(g.errors || [])].map(s => s.id)); } catch (_) {}
-  return new Set(rows.filter(s => !isWorking(s) && !s.archived).map(s => s.id));
-}
+// Notifications: the shell's own inbox (WosBell), the same items Chats lists. Read-only here; a tap opens one.
+function notesOf(host) { try { return (host.notes?.items?.() || []).filter(i => i && i.id && !i.archived); } catch (_) { return []; } }
+const notePlain = t => String(t || '').replace(/\[([^\]\n]+)\]\((https?:[^\s)]+)\)/g, '$1').replace(/[*`#>]/g, '').replace(/\s+/g, ' ').trim();
+const noteTitle = it => notePlain(it.title) || notePlain(String(it.message || '').split('\n').find(l => l.trim())) || 'Notification';
+const noteFrom = it => it.appName || it.fromName || it.app || it.from || 'Wizard';
 function isWorking(s) { return WORKING.has(String(s?.status || '')); }
 function needsYou(s) { return ['waiting_for_approval', 'unknown'].includes(s?.status) || s?.attention?.state === 'needs_you'; }
 function failed(s) { return s?.status === 'failed' || s?.status === 'interrupted'; }
@@ -189,7 +191,7 @@ function archived(host, s) { try { return !!host.live?.inArchive?.(s); } catch (
 export default {
   contract: 'wizard.chats-view/1', id: 'telegram', name: 'Telegram Style',
   mount(el, host) {
-    let folder = 'all', query = '', inArchive = false, sig = '', searchFocus = false;
+    let folder = 'ready', query = '', inArchive = false, sig = '', searchFocus = false;
     mounted++;
     if (!document.getElementById(STYLE_ID)) { const st = host.element('style'); st.id = STYLE_ID; st.textContent = CSS; document.head.append(st); }
     el.classList.add('tg-view');
@@ -201,7 +203,7 @@ export default {
     function pick() {
       const all = visible(), q = query.trim().toLowerCase();
       let rows = all.filter(s => archived(host, s) === inArchive);
-      if (!inArchive && folder === 'ready') { const r = readyIds(host, rows); rows = rows.filter(s => r.has(s.id)); }
+      if (!inArchive && folder === 'ready') rows = rows.filter(s => !isWorking(s));
       if (!inArchive && folder === 'working') rows = rows.filter(isWorking);
       if (q) rows = all.filter(s => `${s.title || ''} ${s.preview || ''}`.toLowerCase().includes(q));
       const t = s => Date.parse(stamp(host, s)) || 0;
@@ -209,8 +211,27 @@ export default {
     }
     function counts() {
       const live = visible().filter(s => !archived(host, s));
-      const r = readyIds(host, live);
-      return { ready: live.filter(s => r.has(s.id) && (host.isUnread(s) || needsYou(s) || failed(s))).length, working: live.filter(isWorking).length, archive: visible().length - live.length };
+      return { ready: live.filter(s => !isWorking(s) && (host.isUnread(s) || needsYou(s) || failed(s))).length, working: live.filter(isWorking).length,
+        notes: notesOf(host).filter(i => !i.read).length, archive: visible().length - live.length };
+    }
+    function notes() {
+      const t = i => Number(i.time) || 0;
+      return notesOf(host).sort((a, b) => (a.read - b.read) || (t(b) - t(a)));
+    }
+    function noteRow(it) {
+      const b = host.element('button'); b.type = 'button'; b.className = 'tg-row tg-note'; b.dataset.tgNote = it.id;
+      if (!it.read) b.classList.add('unread');
+      const av = host.element('span'); av.className = 'tg-av emo tg-note-av'; av.textContent = '\u{1F514}';
+      const bd = host.element('span'); bd.className = 'tg-bd';
+      const l1 = host.element('span'); l1.className = 'tg-l1';
+      const name = host.element('b'); name.textContent = noteTitle(it); l1.append(name);
+      const time = host.element('time'); time.textContent = it.time ? when(new Date(it.time * 1000).toISOString()) : ''; l1.append(time);
+      const l2 = host.element('span'); l2.className = 'tg-l2';
+      const pv = host.element('span'); const from = host.element('strong'); from.textContent = noteFrom(it) + ': ';
+      pv.append(from, (it.source === 'cron' ? 'Scheduled job \u00b7 ' : '') + notePlain(it.message).slice(0, 160)); l2.append(pv);
+      if (!it.read) { const x = host.element('i'); x.className = 'tg-badge ' + ((Number(it.priority) || 3) >= 4 ? 'at' : 'dot'); if ((Number(it.priority) || 3) >= 4) x.textContent = '!'; l2.append(x); }
+      bd.append(l1, l2); b.append(av, bd);
+      return b;
     }
 
     function row(s) {
@@ -239,8 +260,9 @@ export default {
     }
 
     function list() {
-      const c = counts(), rows = pick();
-      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s)]), c]);
+      const c = counts(), noteMode = folder === 'notes' && !inArchive && !query.trim();
+      const rows = noteMode ? [] : pick(), nts = noteMode ? notes() : [];
+      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s)]), c]);
       if (next === sig && el.querySelector('.tg-list')) return;
       sig = next;
       const wrap = host.element('div'); wrap.className = 'tg-wrap';
@@ -263,7 +285,7 @@ export default {
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
           t.setAttribute('aria-selected', String(folder === id)); t.textContent = label;
-          const n = id === 'ready' ? c.ready : id === 'working' ? c.working : 0;
+          const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
         }
@@ -271,7 +293,11 @@ export default {
       }
       const sc = host.element('div'); sc.className = 'tg-scroll';
       for (const s of rows) sc.append(row(s));
-      if (!rows.length) {
+      for (const it of nts) sc.append(noteRow(it));
+      if (noteMode && !nts.length) {
+        const e = host.element('div'); e.className = 'tg-empty'; const b = host.element('b'); b.textContent = 'No notifications';
+        e.append(b, 'Alerts and scheduled updates show up here.'); sc.append(e);
+      } else if (!noteMode && !rows.length) {
         const e = host.element('div'); e.className = 'tg-empty'; const b = host.element('b');
         b.textContent = query ? 'No results' : folder === 'working' ? 'Nothing running' : folder === 'ready' ? 'All caught up' : 'No chats yet';
         e.append(b, query ? 'Try another word.' : 'Tap the pencil to start one.'); sc.append(e);
@@ -308,7 +334,8 @@ export default {
     host.listen('click', e => {
       const f = e.target.closest('[data-tg-folder]');
       if (f) { folder = f.dataset.tgFolder; list(); return; }
-      if (e.target.closest('[data-tg-archive]')) { inArchive = true; folder = 'all'; list(); return; }
+      const n = e.target.closest('[data-tg-note]'); if (n) { host.notes?.open?.(n.dataset.tgNote); return; }
+      if (e.target.closest('[data-tg-archive]')) { inArchive = true; list(); return; }
       if (e.target.closest('[data-tg-archive-back]')) { inArchive = false; list(); }
     });
     host.listen('input', e => {
@@ -320,11 +347,14 @@ export default {
       if (e.key === 'Escape' && e.target.matches?.('[data-tg-search]') && query) { query = ''; searchFocus = false; list(); }
     });
     host.subscribe(update);
+    let notesOff = null;
+    try { notesOff = host.notes?.watch?.(() => { if (!host.thread) list(); }) || null; } catch (_) {}
 
     return {
       update,
       unmount() {
         sig = ''; el.classList.remove('tg-view'); delete el.dataset.tgTheme;
+        try { notesOff?.(); } catch (_) {}
         mounted = Math.max(0, mounted - 1);
         if (!mounted) document.getElementById(STYLE_ID)?.remove();
       },

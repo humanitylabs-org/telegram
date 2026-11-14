@@ -99,6 +99,19 @@ function start() {
     subscribe: fn => LIVE.onChange(() => { try { fn(); } catch (e) { console.error(e); } }),
     onAppearance: fn => { const o = new MutationObserver(() => fn()); o.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-skin', 'data-color-scheme', 'class'] }); return () => o.disconnect(); },
     toast: (_i, text) => console.log(text),
+    // The shell's notifications (the same inbox Chats lists). Open = the shell's own notification view when Chats
+    // holds them, else the item's app (or Notifications), marking it read.
+    notes: {
+      items: () => P.WosBell?.items?.() || [],
+      watch: fn => P.WosBell?.watch?.(() => { try { fn(); } catch (e) { console.error(e); } }),
+      open: id => {
+        const S = P.WosSkinHost;
+        if (S?.inboxList && S.inboxAct?.('open', id)) return;
+        const it = P.WosBell?.item?.(id);
+        try { P.WosBell?.mark?.([id], { read: true }); } catch (_) {}
+        if (typeof P.WizOpenApp === 'function') { if (it?.app) P.WizOpenApp(it.app, it.open || ''); else P.WizOpenApp('notifications'); }
+      },
+    },
   };
   instance = view.mount(listPane, host);
   const markActive = () => { for (const r of listPane.querySelectorAll('[data-chopen]')) r.classList.toggle('tg-active', r.dataset.chopen === thread); };
