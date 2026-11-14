@@ -265,7 +265,10 @@ function start() {
       <div class="ch-msgs">${when ? `<div class="tg-day"><span>${esc(day(when.toISOString()))}</span></div>` : ''}<div class="msg a"><div class="bub"><div class="tg-text">${rich(text || it.title || '')}</div><span class="mmeta"><time>${when ? esc(clock(when.toISOString())) : ''}</time></span></div></div></div>
       <p class="tg-err" role="status"></p>
       <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-noteact="done">Done</button></div></div>
+      ${composerHtml(false)}
     </div>`;
+    const ta = threadPane.querySelector('.ch-compose textarea'); if (ta) ta.placeholder = 'Reply to start a chat about this';
+    paintTray(); syncSend();
   }
   function close() { recCancel(); unfollow(); thread = null; msgs = []; msgSig = ''; approval = null; show(); }
   function paintEmpty() { threadPane.innerHTML = '<div class="ch-thread tg-none"><div class="tg-day"><span>Select a chat to start messaging</span></div></div>'; }
@@ -450,13 +453,21 @@ function start() {
   async function deliver(text, fileIds = []) {
     if (sending) throw new Error('Still sending the last message');
     sending = true;
+    // A reply to a notification starts a new chat that carries it, then clears the notification.
+    let noteId = '', prevThread = thread;
+    if (isNote()) {
+      const it = NOTES.item(thread.slice(5)); noteId = it?.id || '';
+      if (it) { const body = String(it.details || it.message || '').replace(/\n*\[SILENT\]\s*/g, '\n').trim().slice(0, 1500);
+        text = `Re: notification "${it.title || 'Notification'}"${it.appName || it.fromName ? ` from ${it.appName || it.fromName}` : ''}\n> ${body.split('\n').join('\n> ')}\n\n${text}`; }
+      thread = '__new__'; msgs = [];
+    }
     msgs.push({ id: 'pending', role: 'user', text, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
     try {
       const opts = fileIds.length ? { fileIds } : {};
-      if (thread === '__new__') { const r = await LIVE.send(text, opts); thread = r.sessionId; }
+      if (thread === '__new__') { const r = await LIVE.send(text, opts); thread = r.sessionId; if (noteId) NOTES.done(noteId); }
       else await LIVE.reply(thread, text, opts);
       msgSig = ''; setTimeout(() => { load(); follow(); }, 700);
-    } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); paintThread(); throw e; }
+    } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
     finally { sending = false; }
   }
   function showErr(text) { const err = root.querySelector('.tg-err'); if (err) { err.textContent = text; setTimeout(() => { if (err.textContent === text) err.textContent = ''; }, 6000); } else console.warn(text); }
