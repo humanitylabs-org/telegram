@@ -94,17 +94,27 @@ function makeNotes() {
   return {
     items: () => items,
     watch: fn => { subs.add(fn); refresh(); return () => subs.delete(fn); },
-    open: id => {
-      const it = items.find(i => i.id === id); mark(id);
-      const S = P?.WosSkinHost;
-      if (S?.inboxList && P.WosBell?.item?.(id) && S.inboxAct?.('open', id)) return;
-      if (typeof P?.WizOpenApp === 'function') { if (it?.app) P.WizOpenApp(it.app, it.open || ''); else P.WizOpenApp('notifications'); }
+    item: id => items.find(i => i.id === id) || null,
+    read: id => mark(id),
+    opener: null,
+    open(id) { this.opener?.(id); },
+    // Done: archive it in Notifications, so it leaves every list.
+    async done(id) {
+      items = items.filter(i => i.id !== id); emit();
+      let ok = false;
+      try { ok = (await fetch('/notifications/api/mark', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id], archived: true }) })).ok; } catch (_) {}
+      try { P?.WosBell?.refresh?.(true); } catch (_) {}
+      refresh(); return ok;
     },
+    // Badge only: this app's alerts stop coming to Chats and only count on its icon (Settings > Notifications).
+    sourceOf: it => { try { const B = P?.WosBell, id = B?.routeIdOf?.(it); return id && id !== 'notifications' ? { id, name: it.appName || it.fromName || B.nameOf?.(id) || id } : null; } catch (_) { return null; } },
+    badgeOnly(it) { const src = this.sourceOf(it); if (!src) return false; let ok = false; try { ok = !!P.WosBell.setRoute(src.id, 'badge'); } catch (_) {} items = items.filter(i => this.sourceOf(i)?.id !== src.id); emit(); return ok; },
   };
 }
 
 function start() {
   const NOTES = makeNotes();
+  NOTES.opener = id => openNote(id);
   let thread = null, instance = null, msgs = [], msgSig = '', loading = false, sending = false, draft = '';
   let tray = [], stream = null, streamSnap = null, approval = null, apKey = '', rec = null, recT = null, menu = null;
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
@@ -153,6 +163,7 @@ function start() {
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
     if (e.target.closest('.tg-menu')) return;
     const row = e.target.closest('[data-chopen]'); if (row) { open(row.dataset.chopen); return; }
+    const na = e.target.closest('[data-tg-noteact]'); if (na) { noteAct(na.dataset.tgNoteact); return; }
     if (e.target.closest('[data-chnew]')) { open('__new__'); return; }
     if (e.target.closest('[data-tg-back]')) { close(); return; }
     if (e.target.closest('[data-tg-attach]')) { root.querySelector('#tg-file')?.click(); return; }
@@ -209,10 +220,33 @@ function start() {
     if (id !== '__new__') { try { LIVE.markSeen?.(id); } catch (_) {} load(); follow(); checkApproval(); }
     show(); focusComposer();
   }
+  const isNote = () => typeof thread === 'string' && thread.startsWith('note:');
+  function openNote(id) { closeMenu(); unfollow(); thread = 'note:' + id; msgs = []; approval = null; NOTES.read(id); show(); }
+  function noteAct(act) {
+    const it = NOTES.item(thread.slice(5)); if (!it) { close(); return; }
+    if (act === 'done') { NOTES.done(it.id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); close(); return; }
+    if (act === 'badge') { NOTES.badgeOnly(it); close(); return; }
+    if (act === 'app' && typeof P?.WizOpenApp === 'function') P.WizOpenApp(it.app || it.from, it.open || '');
+  }
+  function paintNote() {
+    const it = NOTES.item(thread.slice(5));
+    if (!it) { threadPane.innerHTML = '<div class="ch-thread"><div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="ti"><b>Notification</b><span class="tg-sub">cleared</span></div></div><div class="ch-msgs"></div></div>'; return; }
+    const src = NOTES.sourceOf(it), from = it.appName || it.fromName || (src && src.name) || 'Wizard';
+    const when = it.time ? new Date(it.time * 1000) : null;
+    const text = String(it.details || it.message || '').replace(/\n*\[SILENT\]\s*/g, '\n').trim();
+    const app = it.app || it.from;
+    syncTheme();
+    threadPane.innerHTML = `<div class="ch-thread tg-note-view">
+      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm tg-note-av">\u{1F514}</span><div class="ti"><b>${esc(it.title || 'Notification')}</b><span class="tg-sub">${esc(from)}</span></div></div>
+      <div class="ch-msgs">${when ? `<div class="tg-day"><span>${esc(day(when.toISOString()))}</span></div>` : ''}<div class="msg a"><div class="bub"><div class="tg-text">${rich(text || it.title || '')}</div><span class="mmeta"><time>${when ? esc(clock(when.toISOString())) : ''}</time></span></div></div></div>
+      <p class="tg-err" role="status"></p>
+      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-noteact="done">Done</button></div></div>
+    </div>`;
+  }
   function close() { recCancel(); unfollow(); thread = null; msgs = []; msgSig = ''; approval = null; show(); }
   function paintEmpty() { threadPane.innerHTML = '<div class="ch-thread tg-none"><div class="tg-day"><span>Select a chat to start messaging</span></div></div>'; }
   async function load() {
-    if (loading || !thread || thread === '__new__') return;
+    if (loading || !thread || thread === '__new__' || isNote()) return;
     loading = true; const id = thread;
     try {
       const rows = await LIVE.messages(id);
@@ -225,6 +259,7 @@ function start() {
   }
   // Live reply: the shell's own run stream, word by word, with the tool that is running.
   function follow() {
+    if (isNote()) return;
     const s = thread && LIVE.session(thread);
     const runId = s && WORKING.has(s.status) ? (s.runId || LIVE.pendingRun?.(thread) || '') : '';
     if (stream && stream.runId === runId) return;
@@ -242,6 +277,7 @@ function start() {
 
   /* ---------- approvals and questions ---------- */
   async function checkApproval() {
+    if (isNote()) return;
     const s = thread && LIVE.session(thread); const id = thread;
     if (!s?.runId || !['waiting_for_approval', 'running'].includes(s.status)) { if (approval) { approval = null; apKey = ''; paintThread(); } return; }
     try {
@@ -446,6 +482,7 @@ function start() {
   }
   function paintThread() {
     if (!thread) return;
+    if (isNote()) { paintNote(); return; }
     const s = thread !== '__new__' ? LIVE.session(thread) : null;
     const old = root.querySelector('.ch-msgs');
     const keepBottom = !old || old.scrollHeight - old.scrollTop - old.clientHeight < 80, prevTop = old?.scrollTop || 0;
