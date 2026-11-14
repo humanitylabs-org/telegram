@@ -72,7 +72,37 @@ function fileHtml(f) {
   return `<a class="tg-file" href="${esc(f.url)}" target="_blank" rel="noopener"><i>📄</i><span>${esc(f.name)}</span></a>`;
 }
 
+function makeNotes() {
+  let items = [], busy = false; const subs = new Set();
+  const emit = () => { for (const fn of [...subs]) { try { fn(items); } catch (e) { console.error(e); } } };
+  async function refresh() {
+    if (busy) return; busy = true;
+    try {
+      const r = await fetch('/notifications/api/items?view=inbox&limit=100', { cache: 'no-store', credentials: 'same-origin' });
+      if (r.ok) { const d = await r.json(); if (Array.isArray(d?.items)) { const next = d.items.filter(i => i && i.id && !i.archived); if (JSON.stringify(next) !== JSON.stringify(items)) { items = next; emit(); } } }
+    } catch (_) {} finally { busy = false; }
+  }
+  async function mark(id) {
+    items = items.map(i => i.id === id ? { ...i, read: true } : i); emit();
+    try { await fetch('/notifications/api/mark', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id], read: true }) }); } catch (_) {}
+    try { P?.WosBell?.refresh?.(true); } catch (_) {}
+    refresh();
+  }
+  if (P) { refresh(); setInterval(refresh, 30000); addEventListener('focus', refresh); document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); }); }
+  return {
+    items: () => items,
+    watch: fn => { subs.add(fn); refresh(); return () => subs.delete(fn); },
+    open: id => {
+      const it = items.find(i => i.id === id); mark(id);
+      const S = P?.WosSkinHost;
+      if (S?.inboxList && P.WosBell?.item?.(id) && S.inboxAct?.('open', id)) return;
+      if (typeof P?.WizOpenApp === 'function') { if (it?.app) P.WizOpenApp(it.app, it.open || ''); else P.WizOpenApp('notifications'); }
+    },
+  };
+}
+
 function start() {
+  const NOTES = makeNotes();
   let thread = null, instance = null, msgs = [], msgSig = '', loading = false, sending = false, draft = '';
   let tray = [], stream = null, streamSnap = null, approval = null, apKey = '', rec = null, recT = null, menu = null;
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
@@ -99,19 +129,9 @@ function start() {
     subscribe: fn => LIVE.onChange(() => { try { fn(); } catch (e) { console.error(e); } }),
     onAppearance: fn => { const o = new MutationObserver(() => fn()); o.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-skin', 'data-color-scheme', 'class'] }); return () => o.disconnect(); },
     toast: (_i, text) => console.log(text),
-    // The shell's notifications (the same inbox Chats lists). Open = the shell's own notification view when Chats
-    // holds them, else the item's app (or Notifications), marking it read.
-    notes: {
-      items: () => P.WosBell?.items?.() || [],
-      watch: fn => P.WosBell?.watch?.(() => { try { fn(); } catch (e) { console.error(e); } }),
-      open: id => {
-        const S = P.WosSkinHost;
-        if (S?.inboxList && S.inboxAct?.('open', id)) return;
-        const it = P.WosBell?.item?.(id);
-        try { P.WosBell?.mark?.([id], { read: true }); } catch (_) {}
-        if (typeof P.WizOpenApp === 'function') { if (it?.app) P.WizOpenApp(it.app, it.open || ''); else P.WizOpenApp('notifications'); }
-      },
-    },
+    // Notifications: read straight from the Notifications app (same origin), so the tab never depends on this
+    // device's Chats routing. Tap = mark read there, then open it the way Chats does (or the item's app).
+    notes: NOTES,
   };
   instance = view.mount(listPane, host);
   const markActive = () => { for (const r of listPane.querySelectorAll('[data-chopen]')) r.classList.toggle('tg-active', r.dataset.chopen === thread); };
@@ -197,7 +217,7 @@ function start() {
       if (thread !== id) return;
       msgs = rows.filter(m => m.role === 'user' || m.role === 'assistant').map(shape).filter(m => m.text || m.files.length);
       const sig = msgs.length + ':' + (msgs.at(-1)?.id || '') + ':' + (LIVE.session(id)?.status || '') + ':' + (LIVE.session(id)?.title || '');
-      if (sig !== msgSig) { msgSig = sig; paintThread(); }
+      if (sig !== msgSig) { msgSig = sig; paintThread(); try { if (LIVE.isNew?.(LIVE.session(id))) LIVE.markSeen(id); } catch (_) {} }
     } catch (e) { console.error(e); }
     finally { loading = false; }
   }

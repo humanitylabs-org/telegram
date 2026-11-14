@@ -211,7 +211,7 @@ export default {
     }
     function counts() {
       const live = visible().filter(s => !archived(host, s));
-      return { ready: live.filter(s => !isWorking(s) && (host.isUnread(s) || needsYou(s) || failed(s))).length, working: live.filter(isWorking).length,
+      return { ready: live.filter(s => !isWorking(s) && host.isUnread(s)).length, working: live.filter(isWorking).length,
         notes: notesOf(host).filter(i => !i.read).length, archive: visible().length - live.length };
     }
     function notes() {
@@ -252,9 +252,8 @@ export default {
       else if (needsYou(s) && s.attention?.ask) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st, s.attention.ask); }
       else pv.textContent = esc(s.attention?.ask || s.preview || '');
       l2.append(pv);
-      if (failed(s)) { const x = host.element('i'); x.className = 'tg-badge err'; x.textContent = '!'; l2.append(x); }
-      else if (needsYou(s)) { const x = host.element('i'); x.className = 'tg-badge at'; x.textContent = '@'; l2.append(x); }
-      else if (unread) { const x = host.element('i'); x.className = 'tg-badge dot'; l2.append(x); }
+      // One rule: a badge means unread, and opening the chat clears it (its kind says why it matters).
+      if (unread) { const x = host.element('i'); x.className = 'tg-badge ' + (failed(s) ? 'err' : needsYou(s) ? 'at' : 'dot'); x.textContent = failed(s) ? '!' : needsYou(s) ? '@' : ''; l2.append(x); }
       bd.append(l1, l2); b.append(av, bd);
       return b;
     }
