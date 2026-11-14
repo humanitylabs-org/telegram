@@ -75,11 +75,13 @@ function fileHtml(f) {
 function makeNotes() {
   let items = [], busy = false; const subs = new Set();
   const emit = () => { for (const fn of [...subs]) { try { fn(items); } catch (e) { console.error(e); } } };
+  // Only what Settings > Notifications sends to Chats: Badge, Morning report and Off sources stay out, as in Chats.
+  const inChats = it => { const B = P?.WosBell; try { return !B?.route || !B?.routeIdOf || B.route(B.routeIdOf(it)) === 'chats'; } catch (_) { return true; } };
   async function refresh() {
     if (busy) return; busy = true;
     try {
       const r = await fetch('/notifications/api/items?view=inbox&limit=100', { cache: 'no-store', credentials: 'same-origin' });
-      if (r.ok) { const d = await r.json(); if (Array.isArray(d?.items)) { const next = d.items.filter(i => i && i.id && !i.archived); if (JSON.stringify(next) !== JSON.stringify(items)) { items = next; emit(); } } }
+      if (r.ok) { const d = await r.json(); if (Array.isArray(d?.items)) { const next = d.items.filter(i => i && i.id && !i.archived && inChats(i)); if (JSON.stringify(next) !== JSON.stringify(items)) { items = next; emit(); } } }
     } catch (_) {} finally { busy = false; }
   }
   async function mark(id) {
