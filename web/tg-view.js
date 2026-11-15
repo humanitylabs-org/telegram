@@ -10,8 +10,6 @@ const AVATARS = [
 ];
 // Every chat is Ready or Working; the shell's notifications have their own tab (Miguel, 14 Nov 2026: no All chats).
 const FOLDERS = [['ready', 'Ready'], ['working', 'Working'], ['notes', 'Notifications']];
-// Wizard app keys (⌥ + letter, pressed by the shell): R Ready, G Working (going), B Notifications (bell).
-const FOLDER_KEYS = { ready: 'r', working: 'g', notes: 'b' };
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 let mounted = 0;
 
@@ -221,6 +219,7 @@ export default {
     }
     function notes() {
       const t = i => Number(i.time) || 0;
+      // ⌥ keys: only Wizard's own meanings, done here while this app is in front (⌥K search, ⌥N new chat, ⌥E archive).
       // Newest first, nothing else: reading one never moves it (Miguel, 15 Nov 2026).
       return notesOf(host).sort((a, b) => (t(b) - t(a)) || String(a.id).localeCompare(String(b.id)));
     }
@@ -283,13 +282,13 @@ export default {
       }
       root.append(top);
       const sb = host.element('label'); sb.className = 'tg-search';
-      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats'); input.dataset.wzKey = '/'; input.dataset.wzKeyLabel = 'Search';
+      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats'); input.dataset.wzKey = 'k'; input.dataset.wzKeyLabel = 'Search';
       sb.append(svg(host, ICON.search), input); root.append(sb);
       if (!inArchive && !query) {
         const tabs = host.element('div'); tabs.className = 'tg-tabs'; tabs.setAttribute('role', 'tablist');
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
-          t.setAttribute('aria-selected', String(folder === id)); t.dataset.wzKey = FOLDER_KEYS[id]; t.dataset.wzKeyLabel = label; const lb = host.element('span'); lb.textContent = label; t.append(lb);
+          t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
           const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);

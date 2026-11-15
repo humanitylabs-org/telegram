@@ -173,7 +173,7 @@ function start() {
   const rowKey = r => r.dataset.chopen || (r.dataset.tgNote ? 'note:' + r.dataset.tgNote : '');
   const listRows = () => [...listPane.querySelectorAll('[data-chopen], [data-tg-note]')].filter(r => r.getClientRects().length);
   const markActive = () => { for (const r of listPane.querySelectorAll('[data-chopen], [data-tg-note]')) r.classList.toggle('tg-active', rowKey(r) === thread); };
-  // ↑ / ↓: the next / previous row of the list on screen (the first one when nothing is open).
+  // The next / previous row of the list on screen (the first one when nothing is open).
   function step(dir) {
     const rows = listRows(); if (!rows.length) return;
     const i = rows.findIndex(r => rowKey(r) === thread);
@@ -242,21 +242,6 @@ function start() {
     if (e.target.matches?.('.tg-ap-answer') && e.key === 'Enter') { e.preventDefault(); choose('__answer'); }
     if (e.key === 'Escape') { if (menu) closeMenu(); else if (thread && !e.target.matches?.('[data-tg-search]')) close(); }
   });
-  // Arrow keys (plain, the app's own; Wizard's are ⌥): ↑ ↓ previous / next chat, ← → previous / next tab.
-  // They stay the text's while you are typing something (the box has words in it).
-  addEventListener('keydown', e => {
-    if (menu || e.defaultPrevented || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    if (!/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
-    const t = e.target; if (t?.closest?.('.tg-rename, [data-tg-search]')) return;
-    if (t?.matches?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]') && String(t.value ?? t.textContent ?? '').trim()) return;
-    if (t?.closest?.('.ch-msgs, .tg-ap')) return;
-    e.preventDefault();
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { step(e.key === 'ArrowDown' ? 1 : -1); return; }
-    const tabs = [...listPane.querySelectorAll('[data-tg-folder]')]; if (!tabs.length) return;
-    const i = tabs.findIndex(b => b.getAttribute('aria-selected') === 'true');
-    const n = tabs[Math.max(0, Math.min(tabs.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)))];
-    if (n && n !== tabs[i]) n.click();
-  });
   // Typing with a chat open and nothing focused goes straight into its message box (Telegram Desktop does the same).
   addEventListener('keydown', e => {
     if (!thread || menu || e.defaultPrevented || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.key.length !== 1) return;
@@ -303,7 +288,7 @@ function start() {
       <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm tg-note-av">\u{1F514}</span><div class="ti"><b>${esc(it.title || 'Notification')}</b><span class="tg-sub">${esc(from)}</span></div></div>
       <div class="ch-msgs">${when ? `<div class="tg-day"><span>${esc(day(when.toISOString()))}</span></div>` : ''}<div class="msg a"><div class="bub"><div class="tg-text">${rich(text || it.title || '')}</div><span class="mmeta"><time>${when ? esc(clock(when.toISOString())) : ''}</time></span></div></div></div>
       <p class="tg-err" role="status"></p>
-      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app" data-wz-key="o">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-done data-wz-key="e" data-wz-key-label="Done, then the next one" title="Done, then the next one (⌥E)">Done</button></div></div>
+      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-done data-wz-key="e" data-wz-key-label="Done, then the next one" title="Done, then the next one (⌥E)">Done</button></div></div>
       ${composerHtml(false)}
     </div>`;
     const ta = threadPane.querySelector('.ch-compose textarea'); if (ta) ta.placeholder = 'Reply to start a chat about this';
