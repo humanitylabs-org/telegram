@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 /* Telegram as an app window: layout for the thread the page draws itself. Colours come from tg-view.js. */
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 .tg-root { position: fixed; inset: 0; display: flex; }
@@ -141,3 +142,12 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .msg.u .tg-vp { background: var(--tg-check, #fff); }
 .msg.u .tg-vp svg { fill: var(--tg-out, #766ac8); }
 .msg.u .tg-vp i { border-color: var(--tg-out, #766ac8); }
+.tg-vtx { margin: 6px 0 2px; font-size: 14.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.tg-vtx.wait { font-size: 13px; opacity: .6; font-style: italic; }
+.tg-vtx.off button { border: 0; padding: 0; background: none; color: inherit; font: inherit; font-size: 13px; text-decoration: underline; opacity: .75; cursor: pointer; }
+.tg-rsum { display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tg-rsum span { flex: 1; min-width: 0; }
+.tg-rless { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--tg-primary, #8774e1); font: inherit; font-size: 13.5px; cursor: pointer; }
+.tg-chev { flex: none; width: 8px; height: 8px; margin: 6px 2px 0; border-right: 2px solid var(--tg-primary, #8774e1); border-bottom: 2px solid var(--tg-primary, #8774e1); transform: rotate(45deg); }
+.tg-chev.up { margin: 3px 2px 0; transform: rotate(-135deg); }
+@media (pointer: coarse) { .tg-rless { min-height: 32px; } }

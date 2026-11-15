@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'telegram'
-VERSION = '0.7.5'
+VERSION = '0.8.0'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -148,6 +148,77 @@ TRUSTED_HOSTS = _csv('WIZARD_TRUSTED_HOSTS') | _LOOPBACK
 TRUSTED_ORIGINS = _csv('WIZARD_TRUSTED_ORIGINS') | {'http://' + h for h in _LOOPBACK}
 
 
+# ---- voice transcripts: the Transcriber app hears a voice message once; the words are kept here for every device ----
+TRANSCRIBER = os.environ.get('TRANSCRIBER_URL', 'http://transcriber:8000').rstrip('/')
+TX_FILE = DATA / 'transcripts.json'
+TX_MAX_AUDIO = 25 * 1024 * 1024
+TX_KEEP = 3000
+
+
+def _tx_key(value):
+    k = str(value or '')
+    if not (k.startswith('/wizard/files/') or k.startswith('/wizard/attachments/')) or len(k) > 240 or any(c in k for c in '\r\n\\"<>'):
+        raise Problem(400, 'Unknown voice message.')
+    return k
+
+
+def _tx_load():
+    try:
+        d = json.loads(TX_FILE.read_text())
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _tx_save(d):
+    DATA.mkdir(parents=True, exist_ok=True)
+    keys = list(d)
+    for k in keys[:max(0, len(keys) - TX_KEEP)]:
+        d.pop(k, None)
+    tmp = TX_FILE.with_suffix('.tmp')
+    tmp.write_text(json.dumps(d))
+    os.chmod(tmp, 0o600)
+    tmp.replace(TX_FILE)
+
+
+def transcripts(keys):
+    d = _tx_load()
+    out = {}
+    for k in keys[:60]:
+        if isinstance(k, str) and isinstance(d.get(k), str):
+            out[k] = d[k]
+    return {'transcripts': out}
+
+
+def transcribe(key, audio, mime):
+    import urllib.error
+    import urllib.request
+    import uuid
+    key = _tx_key(key)
+    if not audio:
+        raise Problem(400, 'No audio.')
+    ext = {'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav'}.get(mime, 'webm')
+    b = uuid.uuid4().hex
+    parts = []
+    for name, value in (('model', os.environ.get('TRANSCRIBER_MODEL', 'Systran/faster-whisper-small')), ('response_format', 'json')):
+        parts.append(f'--{b}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    parts.append(f'--{b}\r\nContent-Disposition: form-data; name="file"; filename="voice.{ext}"\r\nContent-Type: {mime or "audio/webm"}\r\n\r\n'.encode() + audio + b'\r\n')
+    parts.append(f'--{b}--\r\n'.encode())
+    req = urllib.request.Request(TRANSCRIBER + '/v1/audio/transcriptions', data=b''.join(parts), method='POST', headers={'Content-Type': f'multipart/form-data; boundary={b}'})
+    try:
+        with urllib.request.urlopen(req, timeout=240) as r:
+            text = str(json.loads(r.read()).get('text') or '').strip()
+    except urllib.error.HTTPError as e:
+        raise Problem(502, f'Transcriber answered {e.code}.') from None
+    except (urllib.error.URLError, OSError, ValueError):
+        raise Problem(503, 'Get the Transcriber app to see the words of voice messages.') from None
+    d = _tx_load()
+    d.pop(key, None)
+    d[key] = text[:8000]
+    _tx_save(d)
+    return {'text': d[key]}
+
+
 class Handler(BaseHTTPRequestHandler):
     def refused(self, write=False):
         if (self.headers.get('Host') or '').lower() not in TRUSTED_HOSTS:
@@ -186,6 +257,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, list_habits(parse_qs(urlsplit(self.path).query).get('day', [None])[0]))
             except Problem as e:
                 return self.send(e.code, {'error': e.message})
+        if path == '/api/transcripts':
+            try:
+                keys = json.loads(parse_qs(urlsplit(self.path).query).get('keys', ['[]'])[0])
+                return self.send(200, transcripts(keys if isinstance(keys, list) else []))
+            except ValueError:
+                return self.send(400, {'error': 'keys must be a JSON list.'})
         if path == '/api/time':
             return self.send(200, {'utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
         # The view: any file directly in web/, by an allowlisted type. No subpaths, no dotfiles.
@@ -204,6 +281,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.refused(write=True):
             return
         path = urlsplit(self.path).path
+        if path == '/api/transcribe':
+            try:
+                mime = self.headers.get('Content-Type', '').split(';')[0].strip().lower()
+                if not mime.startswith('audio/'):
+                    return self.send(415, {'error': 'Send the voice message audio.'})
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= TX_MAX_AUDIO:
+                    return self.send(413, {'error': 'Voice message too large.'})
+                key = parse_qs(urlsplit(self.path).query).get('key', [''])[0]
+                _tx_key(key)
+                return self.send(200, transcribe(key, self.rfile.read(size), mime))
+            except Problem as e:
+                return self.send(e.code, {'error': e.message})
+            except ValueError:
+                return self.send(400, {'error': 'Invalid request.'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.send(415, {'error': 'Use application/json.'})
         try:

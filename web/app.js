@@ -47,7 +47,12 @@ function shape(m) {
   let h = { text: raw, attachments: [] };
   try { if (KIT?.helm) h = KIT.helm(raw); } catch (_) {}
   const inline = new Set(Object.values(h.inlineMedia || {}));
-  return { ...m, text: strip(h.text), files: (h.attachments || []).filter(a => !inline.has(a.url)) };
+  return { ...m, text: strip(h.text), ask: typeof m.wizard_ask === 'string' && m.wizard_ask.trim() ? m.wizard_ask.replace(/\s+/g, ' ').trim().slice(0, 400) : askOf(raw), files: (h.attachments || []).filter(a => !inline.has(a.url)) };
+}
+// The reply's own short answer: the plain-words ask from its status line (the same words the chat list shows).
+function askOf(raw) {
+  const m = String(raw).match(/\[WIZARD_STATUS_V1\]\s*([\s\S]*?)\s*\[\/WIZARD_STATUS_V1\]/);
+  try { const a = m && JSON.parse(m[1]); return typeof a?.ask === 'string' ? a.ask.replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch (_) { return ''; }
 }
 function md(text) {
   try { if (KIT?.md) return KIT.md(text); } catch (_) {}
@@ -109,10 +114,48 @@ function toggleVoice(url, onErr) {
   audio.addEventListener('error', () => { paintVoice(url, false, 0); vPlayer = null; onErr?.('Couldn’t play this voice message'); });
   audio.play().catch(e => { if (e?.name !== 'AbortError') { paintVoice(url, false, 0); vPlayer = null; onErr?.('Couldn’t play this voice message'); } });
 }
+/* Transcripts under voice messages: the Transcriber app (on this box) hears each one once; the app keeps the words. */
+const TX_KEY = 'tg.voice-transcripts.v1';
+const TX = (() => { try { return JSON.parse(localStorage.getItem(TX_KEY) || '{}'); } catch (_) { return {}; } })();
+const txWaiting = [], txState = {};
+function txHtml(url) {
+  const t = TX[url];
+  if (typeof t === 'string') return t ? `<div class="tg-vtx" data-tg-vtx="${esc(url)}">${esc(t)}</div>` : '';
+  if (txState[url] === 'failed') return `<div class="tg-vtx off" data-tg-vtx="${esc(url)}"><button type="button" data-tg-vtx-retry="${esc(url)}">Show words</button></div>`;
+  wantWords(url);
+  return `<div class="tg-vtx wait" data-tg-vtx="${esc(url)}">Listening…</div>`;
+}
+function paintWords(url) { for (const n of document.querySelectorAll(`[data-tg-vtx="${CSS.escape(url)}"]`)) n.outerHTML = txHtml(url); }
+function wantWords(url) { if (!url || txState[url] || typeof TX[url] === 'string') return; txState[url] = 'queued'; txWaiting.push(url); setTimeout(txPump, 0); }
+let txBusy = false;
+async function txPump() {
+  if (txBusy || !txWaiting.length) return; txBusy = true;
+  try {
+    // Words another device already got are on the app's server.
+    const ask = txWaiting.filter(u => txState[u] === 'queued').slice(0, 40);
+    if (ask.length) try {
+      const r = await fetch(`api/transcripts?keys=${encodeURIComponent(JSON.stringify(ask))}`, { credentials: 'same-origin', cache: 'no-store' });
+      const got = r.ok ? (await r.json()).transcripts || {} : {};
+      for (const u of ask) { txState[u] = 'checked'; if (typeof got[u] === 'string') { TX[u] = got[u]; saveTx(); paintWords(u); } }
+    } catch (_) { for (const u of ask) txState[u] = 'checked'; }
+    const url = txWaiting.shift(); if (!url || typeof TX[url] === 'string') return;
+    try {
+      const audio = await fetch(url, { credentials: 'same-origin' });
+      if (!audio.ok) throw new Error('audio');
+      const blob = await audio.blob();
+      const r = await fetch(`api/transcribe?key=${encodeURIComponent(url)}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'audio/webm' }, body: blob });
+      if (!r.ok) throw new Error('transcribe');
+      TX[url] = String((await r.json()).text || '').trim(); saveTx(); txState[url] = 'done';
+    } catch (_) { txState[url] = 'failed'; }
+    paintWords(url);
+  } finally { txBusy = false; if (txWaiting.length) setTimeout(txPump, 0); }
+}
+function saveTx() { try { const k = Object.keys(TX); if (k.length > 600) for (const x of k.slice(0, k.length - 600)) delete TX[x]; localStorage.setItem(TX_KEY, JSON.stringify(TX)); } catch (_) {} }
+function retryWords(url) { delete txState[url]; delete TX[url]; paintWords(url); }
 function fileHtml(f) {
   const mime = String(f.mime || '');
   if (mime.startsWith('image/')) return `<a class="tg-img" href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`;
-  if (mime.startsWith('audio/') || /^wizard-voice-/.test(f.name || '')) { voiceLength(f.url); const d = VDUR[f.url]; return `<button type="button" class="tg-vnote" data-tg-vnote="${esc(f.url)}" aria-label="Play voice message"><span class="tg-vp"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg><i></i></span><span class="tg-vw"><span class="tg-vbar"><b></b></span><span class="tg-vd">${d ? mmss(d) : '…'}</span></span></button>`; }
+  if (mime.startsWith('audio/') || /^wizard-voice-/.test(f.name || '')) { voiceLength(f.url); const d = VDUR[f.url]; return `<button type="button" class="tg-vnote" data-tg-vnote="${esc(f.url)}" aria-label="Play voice message"><span class="tg-vp"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg><i></i></span><span class="tg-vw"><span class="tg-vbar"><b></b></span><span class="tg-vd">${d ? mmss(d) : '…'}</span></span></button>${txHtml(f.url)}`; }
   return `<a class="tg-file" href="${esc(f.url)}" target="_blank" rel="noopener"><i>📄</i><span>${esc(f.name)}</span></a>`;
 }
 
@@ -254,6 +297,8 @@ function start() {
     if (e.target.closest('[data-tg-back]')) { close(); return; }
     if (e.target.closest('[data-tg-attach]')) { root.querySelector('#tg-file')?.click(); return; }
     const x = e.target.closest('[data-tg-unattach]'); if (x) { tray = tray.filter(f => f.key !== x.dataset.tgUnattach); paintTray(); syncSend(); return; }
+    const rs = e.target.closest('[data-tg-rsum]'); if (rs) { toggleSummary(rs.dataset.tgRsum); return; }
+    const vr = e.target.closest('[data-tg-vtx-retry]'); if (vr) { retryWords(vr.dataset.tgVtxRetry); return; }
     const vn = e.target.closest('[data-tg-vnote]'); if (vn) { e.preventDefault(); toggleVoice(vn.dataset.tgVnote, showErr); return; }
     if (e.target.closest('[data-tg-mic]')) { recStart(); return; }
     if (e.target.closest('[data-tg-rec-cancel]')) { recCancel(); return; }
@@ -603,6 +648,21 @@ function start() {
       : (ap.choices || []).map(c => `<button type="button" class="${/^(once|session|always|approve|allow|yes)/i.test(c.value) ? 'go' : ''}" data-tg-choice="${esc(c.value)}"${dis}>${esc(c.label)}</button>`).join('');
     return `<div class="tg-ap"><b>${ap.kind === 'clarify' ? 'Question from your Wizard' : 'Your Wizard asks permission'}</b><p>${esc(ap.action)}</p><div class="tg-ap-btns">${buttons}</div></div>`;
   }
+  // Long replies open on their short answer (the line the chat list shows); a tap shows the whole reply.
+  // Collapsed unless the owner chose expanded for Chats (box-wide); a tap on one reply wins over that.
+  const SUMMARY_WORDS = 40, rsumOpen = new Map();
+  function summaryOf(m) {
+    if (!m.ask || m.pending) return '';
+    const words = String(m.text || '').split(/\s+/).filter(Boolean).length;
+    return words > SUMMARY_WORDS && words > 2 * m.ask.split(/\s+/).length ? m.ask : '';
+  }
+  function summaryStartsOpen() { try { return P.WosSkinHost?.replySummary?.get?.().start === 'expanded'; } catch (_) { return false; } }
+  function toggleSummary(key) {
+    const msg = root.querySelector(`[data-tg-rsum="${CSS.escape(key)}"]`)?.closest('.msg'); if (!msg) return;
+    const lead = msg.querySelector('.tg-rsum'), full = msg.querySelector('.tg-rdet'), open = !lead.hidden ? true : false;
+    rsumOpen.set(key, open); lead.hidden = open; full.hidden = !open;
+    if (!open) lead.scrollIntoView({ block: 'nearest' });
+  }
   function paintThread() {
     if (!thread) return;
     if (isNote()) { paintNote(); return; }
@@ -624,7 +684,11 @@ function start() {
       const files = (m.files || []).map(fileHtml).join('');
       const hide = files && ['🎤 Voice message', '📎'].includes(m.text);
       const text = m.text && !hide ? (u ? esc(m.text).replace(/\n/g, '<br>') : rich(m.text)) : '';
-      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}"><div class="bub">${files}${text ? `<div class="tg-text">${text}</div>` : ''}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
+      const lead = !u && summaryOf(m), rk = esc(String(m.id ?? m.timestamp)), open = lead && (rsumOpen.get(String(m.id ?? m.timestamp)) ?? summaryStartsOpen());
+      const shown = !text ? '' : !lead ? `<div class="tg-text">${text}</div>`
+        : `<button type="button" class="tg-rsum" data-tg-rsum="${rk}" aria-expanded="false"${open ? ' hidden' : ''}><span>${esc(/[.!?…"'”’»]$/u.test(lead) ? lead : lead + '.')}</span><i class="tg-chev" aria-hidden="true"></i></button>`
+          + `<div class="tg-rdet"${open ? '' : ' hidden'}><div class="tg-text">${text}</div><button type="button" class="tg-rless" data-tg-rsum="${rk}" aria-expanded="true">Show less<i class="tg-chev up" aria-hidden="true"></i></button></div>`;
+      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}${lead ? ' has-rsum' : ''}"><div class="bub">${files}${shown}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
       if (foldOpen && !folded.has(i + 1)) { body += '</details>'; foldOpen = false; }
     }
     body += liveHtml();
