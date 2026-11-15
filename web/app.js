@@ -142,8 +142,7 @@ function start() {
   let thread = null, instance = null, msgs = [], msgSig = '', loading = false, sending = false, draft = '';
   let tray = [], stream = null, streamSnap = null, approval = null, apKey = '', rec = null, recT = null, menu = null;
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
-  // Keys with no button of their own (⌥J / ⌥K next / previous chat, ⌥E done): invisible controls the shell presses.
-  root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div><div class="tg-keys"><button type="button" tabindex="-1" data-tg-step="1" data-wz-key="j" aria-label="Next chat"></button><button type="button" tabindex="-1" data-tg-step="-1" data-wz-key="k" aria-label="Previous chat"></button><button type="button" tabindex="-1" data-tg-done data-wz-key="e" aria-label="Done: archive this chat or clear this notification, then open the next" aria-disabled="true"></button></div>';
+  root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div>';
   const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
   const WIDE = matchMedia('(min-width: 760px)'), wide = () => WIDE.matches;
   const listen = (type, fn, target = root) => target.addEventListener(type, e => { try { fn(e); } catch (err) { console.error(err); } });
@@ -174,14 +173,14 @@ function start() {
   const rowKey = r => r.dataset.chopen || (r.dataset.tgNote ? 'note:' + r.dataset.tgNote : '');
   const listRows = () => [...listPane.querySelectorAll('[data-chopen], [data-tg-note]')].filter(r => r.getClientRects().length);
   const markActive = () => { for (const r of listPane.querySelectorAll('[data-chopen], [data-tg-note]')) r.classList.toggle('tg-active', rowKey(r) === thread); };
-  // ⌥J / ⌥K: the next / previous row of the list on screen (the first one when nothing is open).
+  // ↑ / ↓: the next / previous row of the list on screen (the first one when nothing is open).
   function step(dir) {
     const rows = listRows(); if (!rows.length) return;
     const i = rows.findIndex(r => rowKey(r) === thread);
     const next = rows[i < 0 ? (dir > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, i + dir))];
     if (next && rowKey(next) !== thread) { next.click(); next.scrollIntoView({ block: 'nearest' }); }
   }
-  // ⌥E: archive the open chat (or clear the open notification) and open the next row, like the AI apps view.
+  // ⌥E (or the header's archive button): archive the open chat (or clear the open notification) and open the next row, like the AI apps view.
   function doneAndNext() {
     if (!thread || thread === '__new__') return;
     const rows = listRows(), i = rows.findIndex(r => rowKey(r) === thread), after = rows[i + 1] || rows[i - 1] || null, nextKey = after && rowKey(after);
@@ -192,7 +191,7 @@ function start() {
   new MutationObserver(markActive).observe(listPane, { childList: true, subtree: true });
   const syncTheme = () => { if (listPane.dataset.tgTheme) threadPane.dataset.tgTheme = listPane.dataset.tgTheme; };
   new MutationObserver(syncTheme).observe(listPane, { attributes: true, attributeFilter: ['data-tg-theme'] });
-  const show = () => { root.classList.toggle('tg-has-thread', !!thread); root.querySelector('[data-tg-done]')?.setAttribute('aria-disabled', String(!thread || thread === '__new__')); syncTheme(); instance.update(); if (thread) paintThread(); else paintEmpty(); markActive(); };
+  const show = () => { root.classList.toggle('tg-has-thread', !!thread); syncTheme(); instance.update(); if (thread) paintThread(); else paintEmpty(); markActive(); };
   WIDE.addEventListener('change', show);
   // Wizard routes Esc and the phone's back gesture to the app's Back: close the menu, then the open chat.
   const registerBack = () => window.WizardApp?.back?.register?.({ canGoBack: () => !!(menu || thread), back: () => { if (menu) closeMenu(); else if (thread) close(); else return false; return true; } });
@@ -204,7 +203,6 @@ function start() {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
     if (e.target.closest('.tg-menu')) return;
-    const st = e.target.closest('[data-tg-step]'); if (st) { step(Number(st.dataset.tgStep)); return; }
     if (e.target.closest('[data-tg-done]')) { doneAndNext(); return; }
     const row = e.target.closest('[data-chopen]'); if (row) { open(row.dataset.chopen); return; }
     const na = e.target.closest('[data-tg-noteact]'); if (na) { noteAct(na.dataset.tgNoteact); return; }
@@ -243,6 +241,21 @@ function start() {
     if (e.target.matches?.('.ch-compose textarea') && e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(pointer: fine)').matches) { e.preventDefault(); send(); }
     if (e.target.matches?.('.tg-ap-answer') && e.key === 'Enter') { e.preventDefault(); choose('__answer'); }
     if (e.key === 'Escape') { if (menu) closeMenu(); else if (thread && !e.target.matches?.('[data-tg-search]')) close(); }
+  });
+  // Arrow keys (plain, the app's own; Wizard's are ⌥): ↑ ↓ previous / next chat, ← → previous / next tab.
+  // They stay the text's while you are typing something (the box has words in it).
+  addEventListener('keydown', e => {
+    if (menu || e.defaultPrevented || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (!/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+    const t = e.target; if (t?.closest?.('.tg-rename, [data-tg-search]')) return;
+    if (t?.matches?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]') && String(t.value ?? t.textContent ?? '').trim()) return;
+    if (t?.closest?.('.ch-msgs, .tg-ap')) return;
+    e.preventDefault();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { step(e.key === 'ArrowDown' ? 1 : -1); return; }
+    const tabs = [...listPane.querySelectorAll('[data-tg-folder]')]; if (!tabs.length) return;
+    const i = tabs.findIndex(b => b.getAttribute('aria-selected') === 'true');
+    const n = tabs[Math.max(0, Math.min(tabs.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)))];
+    if (n && n !== tabs[i]) n.click();
   });
   // Typing with a chat open and nothing focused goes straight into its message box (Telegram Desktop does the same).
   addEventListener('keydown', e => {
@@ -290,7 +303,7 @@ function start() {
       <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm tg-note-av">\u{1F514}</span><div class="ti"><b>${esc(it.title || 'Notification')}</b><span class="tg-sub">${esc(from)}</span></div></div>
       <div class="ch-msgs">${when ? `<div class="tg-day"><span>${esc(day(when.toISOString()))}</span></div>` : ''}<div class="msg a"><div class="bub"><div class="tg-text">${rich(text || it.title || '')}</div><span class="mmeta"><time>${when ? esc(clock(when.toISOString())) : ''}</time></span></div></div></div>
       <p class="tg-err" role="status"></p>
-      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app" data-wz-key="o">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-noteact="done">Done</button></div></div>
+      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app" data-wz-key="o">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-done data-wz-key="e" data-wz-key-label="Done, then the next one" title="Done, then the next one (⌥E)">Done</button></div></div>
       ${composerHtml(false)}
     </div>`;
     const ta = threadPane.querySelector('.ch-compose textarea'); if (ta) ta.placeholder = 'Reply to start a chat about this';
@@ -571,7 +584,7 @@ function start() {
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
     syncTheme();
     threadPane.innerHTML = `<div class="ch-thread">
-      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
+      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${thread !== '__new__' ? '<button type="button" class="tg-ibtn tg-headbtn" data-tg-done data-wz-key="e" data-wz-key-label="Archive, then the next chat" title="Archive, then the next chat (⌥E)" aria-label="Archive, then the next chat"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>' : ''}${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
       <div class="ch-msgs">${body}</div>
       ${approvalHtml()}
       <p class="tg-err" role="status"></p>

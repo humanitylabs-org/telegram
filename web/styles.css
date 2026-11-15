@@ -120,6 +120,8 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-text .tg-img { margin: 6px -6px; }
 .tg-view.tg-view .tg-recbar .tg-rec-time { margin-left: 4px; }
 
-/* Key-only controls (⌥J ⌥K ⌥E): a 1 px box the shell can press, never seen or tabbed to. */
-.tg-keys { position: fixed; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
-.tg-keys button { display: block; width: 1px; height: 1px; padding: 0; border: 0; margin: 0; }
+/* The chat header's archive button (⌥E): archive, then the next chat. */
+.tg-headbtn { flex: none; margin-left: auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--tg-sub); display: grid; place-items: center; cursor: pointer; }
+.tg-headbtn:hover { background: var(--tg-hover, rgba(127,127,127,.12)); }
+.tg-headbtn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tg-headbtn + .tg-stop { margin-left: 6px; }
