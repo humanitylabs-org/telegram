@@ -242,6 +242,25 @@ function start() {
     if (e.target.matches?.('.tg-ap-answer') && e.key === 'Enter') { e.preventDefault(); choose('__answer'); }
     if (e.key === 'Escape') { if (menu) closeMenu(); else if (thread && !e.target.matches?.('[data-tg-search]')) close(); }
   });
+  // ⌥↓ / ⌥↑: next / previous chat in THIS list (Wizard's own meaning for those keys, applied to the list in front).
+  // Window capture, registered before the shell hooks the frame on load, so the shell's sidebar step doesn't also fire.
+  addEventListener('keydown', e => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing || menu) return;
+    if (e.code !== 'ArrowDown' && e.code !== 'ArrowUp') return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    step(e.code === 'ArrowDown' ? 1 : -1); keyCaps(true);
+  }, true);
+  // Holding ⌥ marks the rows those keys go to (⌥↑ on the one above, ⌥↓ on the one below), like Wizard's own key hints.
+  function keyCaps(on) {
+    for (const c of listPane.querySelectorAll('.tg-kcap')) c.remove();
+    if (!on) return;
+    const rows = listRows(), i = rows.findIndex(r => rowKey(r) === thread);
+    const put = (r, label) => { if (!r) return; const c = document.createElement('b'); c.className = 'tg-kcap'; c.textContent = label; c.setAttribute('aria-hidden', 'true'); r.append(c); };
+    put(rows[i < 0 ? 0 : i + 1], '⌥↓'); if (i > 0) put(rows[i - 1], '⌥↑');
+  }
+  addEventListener('keydown', e => { if (e.key === 'Alt' && !e.repeat) keyCaps(true); }, true);
+  addEventListener('keyup', e => { if (e.key === 'Alt') keyCaps(false); }, true);
+  addEventListener('blur', () => keyCaps(false));
   // Typing with a chat open and nothing focused goes straight into its message box (Telegram Desktop does the same).
   addEventListener('keydown', e => {
     if (!thread || menu || e.defaultPrevented || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.key.length !== 1) return;

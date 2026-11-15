@@ -125,3 +125,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-headbtn:hover { background: var(--tg-hover, rgba(127,127,127,.12)); }
 .tg-headbtn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tg-headbtn + .tg-stop { margin-left: 6px; }
+
+/* ⌥↑ / ⌥↓ keycaps on the rows those keys open, while ⌥ is held (same look as Wizard's key hints). */
+.tg-row { position: relative; }
+.tg-kcap { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); height: 18px; padding: 0 6px; border-radius: 5px; display: grid; place-items: center; font: 650 11px/1 var(--tg-font); background: var(--tg-text, #fff); color: var(--tg-bg, #000); box-shadow: 0 2px 8px rgba(0,0,0,.35); pointer-events: none; z-index: 2; }
