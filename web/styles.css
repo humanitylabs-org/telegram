@@ -57,7 +57,16 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 /* attachments in bubbles */
 .tg-img { display: block; margin: -4px -6px 4px; }
 .tg-img img { display: block; max-width: min(100%, 320px); max-height: 320px; border-radius: 12px; object-fit: cover; }
-.tg-voice audio { width: min(260px, 60vw); height: 38px; display: block; }
+.tg-vnote { display: flex; align-items: center; gap: 10px; width: min(240px, 60vw); padding: 2px 0 4px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; --p: 0; }
+.tg-vp { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--tg-primary, #8774e1); }
+.tg-vp svg { width: 18px; height: 18px; fill: #fff; margin-left: 2px; }
+.tg-vp i { display: none; width: 12px; height: 14px; border-left: 4px solid #fff; border-right: 4px solid #fff; }
+.tg-vnote.playing .tg-vp svg { display: none; }
+.tg-vnote.playing .tg-vp i { display: block; }
+.tg-vw { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tg-vbar { position: relative; height: 4px; border-radius: 4px; background: color-mix(in srgb, currentColor 25%, transparent); overflow: hidden; }
+.tg-vbar b { position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); background: currentColor; border-radius: 4px; }
+.tg-vd { font-size: 13px; opacity: .75; font-variant-numeric: tabular-nums; }
 .tg-file { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; padding: 2px 0 4px; }
 .tg-file i { font-style: normal; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--tg-primary, #8774e1); font-size: 20px; }
 .tg-file span { font-weight: 500; overflow-wrap: anywhere; }
@@ -129,3 +138,6 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 /* ⌥↑ / ⌥↓ keycaps on the rows those keys open, while ⌥ is held (same look as Wizard's key hints). */
 .tg-row { position: relative; }
 .tg-kcap { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); height: 18px; padding: 0 6px; border-radius: 5px; display: grid; place-items: center; font: 650 11px/1 var(--tg-font); background: var(--tg-text, #fff); color: var(--tg-bg, #000); box-shadow: 0 2px 8px rgba(0,0,0,.35); pointer-events: none; z-index: 2; }
+.msg.u .tg-vp { background: var(--tg-check, #fff); }
+.msg.u .tg-vp svg { fill: var(--tg-out, #766ac8); }
+.msg.u .tg-vp i { border-color: var(--tg-out, #766ac8); }

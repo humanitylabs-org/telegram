@@ -65,10 +65,54 @@ function rich(text) {
   }
   flush(); return out;
 }
+/* Voice messages: play button, progress bar and length, like Telegram. Recorded webm has no length in its header,
+   so the length comes from probing the end once, then it is remembered on this device. */
+const VDUR_KEY = 'tg.voice-durations.v1';
+const VDUR = (() => { try { return JSON.parse(localStorage.getItem(VDUR_KEY) || '{}'); } catch (_) { return {}; } })();
+const mmss = s => { s = Math.max(0, Math.round(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const vnotes = url => document.querySelectorAll(`[data-tg-vnote="${CSS.escape(url)}"]`);
+const vProbing = new Set();
+function voiceLength(url) {
+  if (!url || VDUR[url] || vProbing.has(url)) return; vProbing.add(url);
+  const a = new Audio(); a.preload = 'metadata';
+  const done = d => {
+    vProbing.delete(url); a.removeAttribute('src'); a.load();
+    if (!(isFinite(d) && d > 0)) { for (const n of vnotes(url)) n.querySelector('.tg-vd').textContent = ''; return; }
+    VDUR[url] = d; try { localStorage.setItem(VDUR_KEY, JSON.stringify(VDUR)); } catch (_) {}
+    for (const n of vnotes(url)) if (!n.classList.contains('playing')) n.querySelector('.tg-vd').textContent = mmss(d);
+  };
+  a.addEventListener('loadedmetadata', () => {
+    if (isFinite(a.duration) && a.duration > 0) return done(a.duration);
+    a.addEventListener('durationchange', function f() { if (isFinite(a.duration) && a.duration > 0) { a.removeEventListener('durationchange', f); done(a.duration); } });
+    a.currentTime = 1e7;
+  });
+  a.addEventListener('error', () => done(0));
+  setTimeout(() => { if (vProbing.has(url)) done(0); }, 15000);
+  a.src = url;
+}
+let vPlayer = null; // { url, audio }
+function paintVoice(url, playing, frac, t) {
+  for (const n of vnotes(url)) {
+    n.classList.toggle('playing', !!playing);
+    if (frac != null) n.style.setProperty('--p', String(Math.max(0, Math.min(1, frac))));
+    const vd = n.querySelector('.tg-vd'); if (playing && t != null) vd.textContent = mmss(t); else if (!playing && VDUR[url]) vd.textContent = mmss(VDUR[url]);
+  }
+}
+function toggleVoice(url, onErr) {
+  if (vPlayer && vPlayer.url === url) { if (vPlayer.audio.paused) vPlayer.audio.play().catch(() => {}); else vPlayer.audio.pause(); return; }
+  if (vPlayer) { vPlayer.audio.pause(); paintVoice(vPlayer.url, false, 0); }
+  const audio = new Audio(url); vPlayer = { url, audio };
+  paintVoice(url, true, 0, 0);
+  audio.addEventListener('timeupdate', () => { const d = VDUR[url] || audio.duration; paintVoice(url, !audio.paused, isFinite(d) && d ? audio.currentTime / d : 0, audio.currentTime); });
+  audio.addEventListener('pause', () => paintVoice(url, false));
+  audio.addEventListener('ended', () => { if (!VDUR[url] && audio.currentTime > 0) { VDUR[url] = audio.currentTime; try { localStorage.setItem(VDUR_KEY, JSON.stringify(VDUR)); } catch (_) {} } paintVoice(url, false, 0); vPlayer = null; });
+  audio.addEventListener('error', () => { paintVoice(url, false, 0); vPlayer = null; onErr?.('Couldn’t play this voice message'); });
+  audio.play().catch(e => { if (e?.name !== 'AbortError') { paintVoice(url, false, 0); vPlayer = null; onErr?.('Couldn’t play this voice message'); } });
+}
 function fileHtml(f) {
   const mime = String(f.mime || '');
   if (mime.startsWith('image/')) return `<a class="tg-img" href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`;
-  if (mime.startsWith('audio/') || /^wizard-voice-/.test(f.name || '')) return `<div class="tg-voice"><audio controls preload="none" src="${esc(f.url)}"></audio></div>`;
+  if (mime.startsWith('audio/') || /^wizard-voice-/.test(f.name || '')) { voiceLength(f.url); const d = VDUR[f.url]; return `<button type="button" class="tg-vnote" data-tg-vnote="${esc(f.url)}" aria-label="Play voice message"><span class="tg-vp"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg><i></i></span><span class="tg-vw"><span class="tg-vbar"><b></b></span><span class="tg-vd">${d ? mmss(d) : '…'}</span></span></button>`; }
   return `<a class="tg-file" href="${esc(f.url)}" target="_blank" rel="noopener"><i>📄</i><span>${esc(f.name)}</span></a>`;
 }
 
@@ -210,6 +254,7 @@ function start() {
     if (e.target.closest('[data-tg-back]')) { close(); return; }
     if (e.target.closest('[data-tg-attach]')) { root.querySelector('#tg-file')?.click(); return; }
     const x = e.target.closest('[data-tg-unattach]'); if (x) { tray = tray.filter(f => f.key !== x.dataset.tgUnattach); paintTray(); syncSend(); return; }
+    const vn = e.target.closest('[data-tg-vnote]'); if (vn) { e.preventDefault(); toggleVoice(vn.dataset.tgVnote, showErr); return; }
     if (e.target.closest('[data-tg-mic]')) { recStart(); return; }
     if (e.target.closest('[data-tg-rec-cancel]')) { recCancel(); return; }
     if (e.target.closest('[data-tg-rec-send]')) { recSend(); return; }
