@@ -119,3 +119,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-fold[open] > summary { margin-bottom: 6px; }
 .tg-text .tg-img { margin: 6px -6px; }
 .tg-view.tg-view .tg-recbar .tg-rec-time { margin-left: 4px; }
+
+/* Key-only controls (⌥J ⌥K ⌥E): a 1 px box the shell can press, never seen or tabbed to. */
+.tg-keys { position: fixed; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.tg-keys button { display: block; width: 1px; height: 1px; padding: 0; border: 0; margin: 0; }

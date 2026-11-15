@@ -10,6 +10,8 @@ const AVATARS = [
 ];
 // Every chat is Ready or Working; the shell's notifications have their own tab (Miguel, 14 Nov 2026: no All chats).
 const FOLDERS = [['ready', 'Ready'], ['working', 'Working'], ['notes', 'Notifications']];
+// Wizard app keys (⌥ + letter, pressed by the shell): R Ready, G Working (going), B Notifications (bell).
+const FOLDER_KEYS = { ready: 'r', working: 'g', notes: 'b' };
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 let mounted = 0;
 
@@ -219,7 +221,8 @@ export default {
     }
     function notes() {
       const t = i => Number(i.time) || 0;
-      return notesOf(host).sort((a, b) => (a.read - b.read) || (t(b) - t(a)));
+      // Newest first, nothing else: reading one never moves it (Miguel, 15 Nov 2026).
+      return notesOf(host).sort((a, b) => (t(b) - t(a)) || String(a.id).localeCompare(String(b.id)));
     }
     function noteRow(it) {
       const b = host.element('button'); b.type = 'button'; b.className = 'tg-row tg-note'; b.dataset.tgNote = it.id;
@@ -280,13 +283,13 @@ export default {
       }
       root.append(top);
       const sb = host.element('label'); sb.className = 'tg-search';
-      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats');
+      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats'); input.dataset.wzKey = '/'; input.dataset.wzKeyLabel = 'Search';
       sb.append(svg(host, ICON.search), input); root.append(sb);
       if (!inArchive && !query) {
         const tabs = host.element('div'); tabs.className = 'tg-tabs'; tabs.setAttribute('role', 'tablist');
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
-          t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
+          t.setAttribute('aria-selected', String(folder === id)); t.dataset.wzKey = FOLDER_KEYS[id]; t.dataset.wzKeyLabel = label; const lb = host.element('span'); lb.textContent = label; t.append(lb);
           const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
@@ -305,7 +308,7 @@ export default {
         e.append(b, query ? 'Try another word.' : 'Tap the pencil to start one.'); sc.append(e);
       }
       root.append(sc);
-      const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.append(svg(host, ICON.pencil));
+      const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.append(svg(host, ICON.pencil));
       wrap.append(root, fab);
       const keep = el.querySelector('.tg-scroll')?.scrollTop || 0;
       el.replaceChildren(wrap);
