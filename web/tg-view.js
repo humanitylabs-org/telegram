@@ -282,7 +282,7 @@ export default {
       }
       root.append(top);
       const sb = host.element('label'); sb.className = 'tg-search';
-      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats'); input.dataset.wzKey = 'k'; input.dataset.wzKeyLabel = 'Search';
+      const input = host.element('input'); input.type = 'search'; input.placeholder = 'Search'; input.value = query; input.dataset.tgSearch = ''; input.setAttribute('aria-label', 'Search chats'); input.dataset.wzKey = 'k'; input.title = 'Search (⌥K)'; input.dataset.wzKeyLabel = 'Search';
       sb.append(svg(host, ICON.search), input); root.append(sb);
       if (!inArchive && !query) {
         const tabs = host.element('div'); tabs.className = 'tg-tabs'; tabs.setAttribute('role', 'tablist');
@@ -307,7 +307,7 @@ export default {
         e.append(b, query ? 'Try another word.' : 'Tap the pencil to start one.'); sc.append(e);
       }
       root.append(sc);
-      const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.append(svg(host, ICON.pencil));
+      const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.title = 'New chat (⌥N)'; fab.append(svg(host, ICON.pencil));
       wrap.append(root, fab);
       const keep = el.querySelector('.tg-scroll')?.scrollTop || 0;
       el.replaceChildren(wrap);
