@@ -602,7 +602,7 @@ function start() {
     draft = ''; if (ta) { ta.value = ''; ta.style.height = ''; }
     const sent = tray; tray = []; paintTray(); syncSend();
     try { await deliver(text || '📎', ids); }
-    catch (e) { tray = sent; draft = text; paintThread(); showErr(e.message || 'Could not send'); }
+    catch (e) { tray = sent; draft = text; paintThread(); const t = root.querySelector('.ch-compose textarea'); if (t && !t.value) t.value = text; syncSend(); showErr(e.message || 'Could not send'); }
   }
   async function deliver(text, fileIds = []) {
     if (sending) throw new Error('Still sending the last message');
@@ -618,7 +618,7 @@ function start() {
     msgs.push({ id: 'pending', role: 'user', text, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
     try {
       const opts = fileIds.length ? { fileIds } : {};
-      if (thread === '__new__') { const r = await LIVE.send(text, opts); thread = r.sessionId; if (noteId) NOTES.done(noteId); }
+      if (thread === '__new__') { const r = await LIVE.send(text, opts); thread = r.sessionId; root.querySelector('.ch-thread[data-tg-for="__new__"]')?.setAttribute('data-tg-for', thread); if (noteId) NOTES.done(noteId); }
       else await LIVE.reply(thread, text, opts);
       msgSig = ''; setTimeout(() => { load(); follow(); }, 700);
     } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
@@ -717,10 +717,20 @@ function start() {
     const working = s && WORKING.has(s.status);
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
     syncTheme();
-    threadPane.innerHTML = `<div class="ch-thread">
-      <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${thread !== '__new__' ? '<button type="button" class="tg-ibtn tg-headbtn" data-tg-done data-wz-key="e" data-wz-key-label="Archive, then the next chat" title="Archive, then the next chat (⌥E)" aria-label="Archive, then the next chat"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>' : ''}${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>
+    const head = `<div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${thread !== '__new__' ? '<button type="button" class="tg-ibtn tg-headbtn" data-tg-done data-wz-key="e" data-wz-key-label="Archive, then the next chat" title="Archive, then the next chat (⌥E)" aria-label="Archive, then the next chat"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>' : ''}${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>`;
+    // Same chat already on screen: update head, messages and approval in place and keep the composer element.
+    // Replacing the textarea mid long-press (the first load lands right after opening) left the phone's
+    // Paste bubble attached to a removed box, off screen or dead until the chat was reopened.
+    const cur = threadPane.querySelector('.ch-thread[data-tg-for]');
+    const reuse = cur && cur.querySelector('.tg-composer') && cur.dataset.tgFor === thread;
+    if (reuse) {
+      cur.querySelector('.ch-head').outerHTML = head;
+      cur.querySelector('.ch-msgs').innerHTML = body;
+      cur.querySelector('.tg-apbox').innerHTML = approvalHtml();
+    } else threadPane.innerHTML = `<div class="ch-thread" data-tg-for="${esc(thread)}">
+      ${head}
       <div class="ch-msgs">${body}</div>
-      ${approvalHtml()}
+      <div class="tg-apbox">${approvalHtml()}</div>
       <p class="tg-err" role="status"></p>
       <div class="tg-composer">${composerHtml(false)}</div>
     </div>`;
@@ -730,6 +740,6 @@ function start() {
     const ans = root.querySelector('.tg-ap-answer'); if (ans) ans.value = answer;
     const m = root.querySelector('.ch-msgs'); m.scrollTop = keepBottom ? m.scrollHeight : prevTop;
     paintTray(); syncSend();
-    if (typing) { const ta = root.querySelector('.ch-compose textarea'); ta.focus({ preventScroll: true }); ta.setSelectionRange(...sel); }
+    if (typing && !reuse) { const ta = root.querySelector('.ch-compose textarea'); ta.focus({ preventScroll: true }); ta.setSelectionRange(...sel); }
   }
 }

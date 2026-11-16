@@ -17,6 +17,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-off { margin: auto; max-width: 340px; padding: 24px; text-align: center; font: 15px/1.4 system-ui, sans-serif; color: var(--wz-text, #ddd); }
 .tg-off b { display: block; font-size: 17px; margin-bottom: 6px; }
 .ch-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tg-apbox { display: contents; }
 .ch-head { flex: none; display: flex; align-items: center; }
 .ch-head .ti { flex: 1; min-width: 0; display: flex; }
 .ch-head .ti b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

@@ -1,7 +1,7 @@
 ---
 name: telegram
 description: Use when the owner asks about the Telegram look for his chats.
-version: 0.8.1
+version: 0.8.2
 author: Oscar (Hermes Agent)
 license: GPL-3.0-only
 platforms: [linux, macos]
