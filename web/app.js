@@ -295,7 +295,7 @@ function start() {
     const na = e.target.closest('[data-tg-noteact]'); if (na) { noteAct(na.dataset.tgNoteact); return; }
     if (e.target.closest('[data-chnew]')) { open('__new__'); return; }
     if (e.target.closest('[data-tg-back]')) { close(); return; }
-    if (e.target.closest('[data-tg-attach]')) { root.querySelector('#tg-file')?.click(); return; }
+    const ab = e.target.closest('[data-tg-attach]'); if (ab) { openAttach(ab); return; }
     const x = e.target.closest('[data-tg-unattach]'); if (x) { tray = tray.filter(f => f.key !== x.dataset.tgUnattach); paintTray(); syncSend(); return; }
     const rs = e.target.closest('[data-tg-rsum]'); if (rs) { toggleSummary(rs.dataset.tgRsum); return; }
     const vr = e.target.closest('[data-tg-vtx-retry]'); if (vr) { retryWords(vr.dataset.tgVtxRetry); return; }
@@ -472,7 +472,28 @@ function start() {
     menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
   }
   function closeMenu() { menu?.remove(); menu = null; }
+  // Attach menu (like Telegram's paperclip): camera, photos/videos or any file, instead of one picker for everything.
+  const PICK = { camera: ['image/*', 'environment', false], photos: ['image/*,video/*', '', true], file: ['*/*', '', true] };
+  function openAttach(btn) {
+    closeMenu();
+    const cam = matchMedia('(pointer: coarse)').matches;
+    menu = document.createElement('div'); menu.className = 'tg-menu tg-attach-menu'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = (cam ? '<button type="button" data-tg-menu="camera">📷 Camera</button>' : '') +
+      '<button type="button" data-tg-menu="photos">🖼 Photo or video</button><button type="button" data-tg-menu="file">📄 File</button>';
+    root.append(menu);
+    const b = btn.getBoundingClientRect(), r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(b.left, innerWidth - r.width - 8)) + 'px';
+    menu.style.top = Math.max(8, b.top - r.height - 6) + 'px';
+  }
+  function pick(kind) {
+    const input = root.querySelector('#tg-file'); if (!input) return;
+    const [accept, capture, multi] = PICK[kind];
+    input.accept = accept; input.multiple = multi;
+    if (capture) input.setAttribute('capture', capture); else input.removeAttribute('capture');
+    input.click();
+  }
   function menuAct(act, id) {
+    if (PICK[act]) { closeMenu(); pick(act); return; }
     if (act === 'save') { doRename(id, menu?.querySelector('input')?.value); return; }
     closeMenu();
     if (act === 'rename') renameBox(id);
@@ -617,9 +638,9 @@ function start() {
   /* ---------- painting ---------- */
   const ICON_BTN = '<svg viewBox="0 0 24 24" class="i-send"><path d="M4 12l16-8-6 16-2-7z"/></svg><svg viewBox="0 0 24 24" class="i-mic"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   function composerHtml(busy) {
-    if (rec) return `<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach a file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
+    if (rec) return `<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
     if (busy) return `<div class="ch-compose tg-recbar"><em class="tg-spin"></em><span class="tg-rec-hint">Sending voice message…</span></div>`;
-    return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach a file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
+    return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
   }
   function paintComposer(busy = false) {
     const box = root.querySelector('.tg-composer'); if (!box) return;

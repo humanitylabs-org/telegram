@@ -151,3 +151,4 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-chev { flex: none; width: 8px; height: 8px; margin: 6px 2px 0; border-right: 2px solid var(--tg-primary, #8774e1); border-bottom: 2px solid var(--tg-primary, #8774e1); transform: rotate(45deg); }
 .tg-chev.up { margin: 3px 2px 0; transform: rotate(-135deg); }
 @media (pointer: coarse) { .tg-rless { min-height: 32px; } }
+@media (pointer: coarse) { .tg-attach-menu > button { min-height: 44px; } }
