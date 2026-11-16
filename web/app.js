@@ -362,6 +362,10 @@ function start() {
     draft = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 180) + 'px'; syncSend();
   });
   listen('change', e => { if (e.target.id === 'tg-file' && e.target.files?.length) { addFiles([...e.target.files]); e.target.value = ''; } });
+  // Android Chrome keeps a framed page's old geometry for the Paste bubble after the keyboard resizes the frame, so the
+  // first hold-to-paste put it at the top of the screen. One extra layout after each resize puts it back on the caret.
+  const relayout = () => { const b = document.body; if (!b) return; b.style.minHeight = '1px'; requestAnimationFrame(() => { b.style.minHeight = ''; }); };
+  window.addEventListener('resize', relayout); window.visualViewport?.addEventListener('resize', relayout);
   listen('paste', e => { const files = [...(e.clipboardData?.files || [])]; if (files.length && thread) { e.preventDefault(); addFiles(files); } });
   listen('dragover', e => { if (thread && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); root.classList.add('tg-drop'); } });
   listen('dragleave', e => { if (!root.contains(e.relatedTarget)) root.classList.remove('tg-drop'); });
