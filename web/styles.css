@@ -92,6 +92,10 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-sendbtn .i-mic { fill: currentColor; }
 .tg-sendbtn .i-mic .ln { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .tg-sendbtn[data-mode="mic"] .i-send, .tg-sendbtn[data-mode="send"] .i-mic { display: none; }
+.tg-micbtn { width: 44px; height: 44px; background: none !important; color: var(--tg-sub, #8a8a8a) !important; }
+.tg-micbtn svg { width: 24px; height: 24px; fill: currentColor; }
+.tg-micbtn .ln { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.tg-micbtn:hover { color: var(--tg-primary, #8774e1) !important; }
 .tg-recbar { align-items: center !important; }
 .tg-recbar .tg-rec-x { width: 44px; height: 44px; background: none !important; color: var(--tg-danger, #e53935) !important; font-size: 18px; }
 .tg-rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tg-danger, #e53935); animation: tg-dot 1.2s infinite; }

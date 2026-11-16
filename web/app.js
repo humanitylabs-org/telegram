@@ -630,13 +630,17 @@ function start() {
   }
   function showErr(text) { const err = root.querySelector('.tg-err'); if (err) { err.textContent = text; setTimeout(() => { if (err.textContent === text) err.textContent = ''; }, 6000); } else console.warn(text); }
   function focusComposer() { const ta = root.querySelector('.ch-compose textarea'); if (ta && matchMedia('(pointer: fine)').matches) ta.focus(); }
-  // Telegram's one round button: a mic while the box is empty, Send once there is something to send.
+  // Telegram's one round button: a mic while the box is empty, Send once there is something to send (plus a mic
+  // beside it while only attachments wait).
   function syncSend() {
     const b = root.querySelector('form.ch-compose .tg-sendbtn'); if (!b) return;
     const has = !!(root.querySelector('.ch-compose textarea')?.value.trim() || tray.length);
     b.dataset.mode = has ? 'send' : 'mic';
     b.toggleAttribute('data-tg-send', has); b.toggleAttribute('data-tg-mic', !has);
     b.setAttribute('aria-label', has ? 'Send' : 'Record a voice message');
+    // Photos attached and nothing typed: keep a mic beside Send so a voice note can go with them.
+    const mic = root.querySelector('form.ch-compose .tg-micbtn');
+    if (mic) mic.hidden = !(tray.length && !root.querySelector('.ch-compose textarea')?.value.trim());
   }
 
   /* ---------- painting ---------- */
@@ -644,7 +648,7 @@ function start() {
   function composerHtml(busy) {
     if (rec) return `<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
     if (busy) return `<div class="ch-compose tg-recbar"><em class="tg-spin"></em><span class="tg-rec-hint">Sending voice message…</span></div>`;
-    return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
+    return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-micbtn" data-tg-mic aria-label="Record a voice message to send with the attachments" title="Voice note with the attachments" hidden><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
   }
   function paintComposer(busy = false) {
     const box = root.querySelector('.tg-composer'); if (!box) return;
