@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Hello Wizard habits and diagnostics",
-    "version": "0.8.6"
+    "version": "0.8.7"
   },
   "paths": {
     "/api/habits": {

@@ -8,6 +8,7 @@ const P = (() => { try { return window.parent !== window && window.parent.WizLiv
 const LIVE = P?.WizLive, KIT = P?.WosChat;
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const PHONE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 
 if (!LIVE) root.innerHTML = '<div class="tg-off"><b>Open Telegram from Wizard</b><p>This window shows your Wizard chats, so it needs to be opened inside Wizard on this box.</p></div>';
 else start();
@@ -270,6 +271,13 @@ function start() {
   // ⌥E (or the header's archive button): archive the open chat (or clear the open notification) and open the next row, like the AI apps view.
   // Leaves the screen first, then writes: a throw or slow write never keeps the chat open, and a repeat
   // (finger lift + its click, or a double tap) within a moment never archives the next chat too.
+  // LIVE.archive answers false (no throw) when the write failed or another write on that chat is still going; retry once.
+  function archiveChat(id) {
+    const fail = e => showErr(e?.message || "Couldn't archive it. Try again.");
+    const go = () => Promise.resolve(LIVE.archive(id));
+    try { go().then(ok => ok !== false || LIVE.session(id)?.archived ? null : new Promise(r => setTimeout(r, 1200)).then(go).then(ok2 => { if (ok2 === false && !LIVE.session(id)?.archived) fail(); })).catch(fail); }
+    catch (e) { fail(e); }
+  }
   let doneAt = 0;
   function doneAndNext() {
     if (!thread || thread === '__new__') return;
@@ -279,12 +287,7 @@ function start() {
     if (nextKey && wide()) { if (nextKey.startsWith('note:')) openNote(nextKey.slice(5)); else open(nextKey); } else close();
     try {
       if (note) { const id = cur.slice(5); NOTES.done(id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); }
-      else {
-        // LIVE.archive answers false (no throw) when the write failed or another write on that chat is still going; retry once.
-        const fail = e => showErr(e?.message || "Couldn't archive it. Try again.");
-        const go = () => Promise.resolve(LIVE.archive(cur));
-        go().then(ok => ok !== false || LIVE.session(cur)?.archived ? null : new Promise(r => setTimeout(r, 1200)).then(go).then(ok2 => { if (ok2 === false && !LIVE.session(cur)?.archived) fail(); })).catch(fail);
-      }
+      else archiveChat(cur);
     } catch (e) { showErr(e?.message || "Couldn't archive it. Try again."); }
   }
   new MutationObserver(markActive).observe(listPane, { childList: true, subtree: true });
@@ -313,6 +316,57 @@ function start() {
   }, true);
   let ghostUntil = 0;
   addEventListener('click', e => { if (Date.now() < ghostUntil) { ghostUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+  // Swipe a chat left in the list (phone): an Archive button slides out from the right and the chat is archived only
+  // when that button is tapped. A short swipe springs back; a tap or scroll anywhere else closes it without opening anything.
+  const SW = 88, SWIPE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>';
+  let sw = null, swOpen = null, swAct = null;
+  const swRow = id => [...listPane.querySelectorAll('[data-chopen]')].find(r => r.dataset.chopen === id && r.getClientRects().length);
+  const swAllowed = () => !thread || wide() ? !listPane.querySelector('[data-tg-archive-back]') : false;
+  function swPaint(id, dx, anim) {
+    const r = swRow(id); if (!r) { swClear(false); return; }
+    r.style.transition = anim ? 'transform .18s ease' : 'none'; r.style.transform = dx ? `translateX(${dx}px)` : '';
+    if (!swAct) { swAct = document.createElement('button'); swAct.type = 'button'; swAct.className = 'tg-swipe-act'; swAct.dataset.tgSwipeArchive = ''; swAct.setAttribute('aria-label', 'Archive'); swAct.innerHTML = SWIPE_ICON + '<span>Archive</span>'; }
+    if (!swAct.isConnected) listPane.append(swAct);
+    const b = r.getBoundingClientRect(), right = b.right - dx, w = Math.max(0, -dx - 6);
+    swAct.dataset.id = id; swAct.style.transition = anim ? 'left .18s ease, width .18s ease' : 'none';
+    Object.assign(swAct.style, { top: b.top + 'px', height: b.height + 'px', left: (right - w) + 'px', width: w + 'px' });
+  }
+  function swClear(anim) {
+    const id = swOpen || sw?.id; swOpen = null;
+    const r = id && swRow(id); if (r) { r.style.transition = anim ? 'transform .18s ease' : 'none'; r.style.transform = ''; }
+    swAct?.remove();
+  }
+  new MutationObserver(() => { if (swOpen && !sw) swPaint(swOpen, -SW, false); }).observe(listPane, { childList: true, subtree: true });
+  listen('touchstart', e => {
+    sw = null;
+    if (e.touches.length !== 1 || e.target.closest('[data-tg-swipe-archive]')) return;
+    const row = e.target.closest('[data-chopen]'), t = e.touches[0];
+    sw = { id: row && swAllowed() ? row.dataset.chopen : null, x: t.clientX, y: t.clientY, lock: null, moved: false, cur: 0 };
+    sw.base = sw.id && swOpen === sw.id ? -SW : 0;
+  });
+  listen('touchmove', e => {
+    if (!sw) return;
+    const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if (sw.lock == null) { if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; sw.lock = sw.id && Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y'; }
+    if (sw.lock !== 'x') return;
+    e.preventDefault();
+    if (swOpen && swOpen !== sw.id) swClear(true);
+    sw.moved = true;
+    let x = Math.min(0, sw.base + dx); if (x < -SW) x = -SW - (-SW - x) * 0.3;
+    sw.cur = x; swPaint(sw.id, x, false);
+  });
+  listen('touchend', e => {
+    const s = sw; sw = null; if (!s) return;
+    if (s.moved) { ghostUntil = Date.now() + 400; if (s.cur < -SW / 2) { swOpen = s.id; swPaint(s.id, -SW, true); } else { swOpen = s.id; swClear(true); } return; }
+    if (swOpen && !e.target.closest('[data-tg-swipe-archive]')) { swClear(true); if (s.lock !== 'y') ghostUntil = Date.now() + 700; }
+  });
+  listen('touchcancel', () => { if (sw?.moved) { swOpen = sw.id; swClear(true); } sw = null; });
+  listPane.addEventListener('scroll', () => { if (swOpen && !sw?.moved) swClear(true); }, true);
+  listen('click', e => {
+    const sa = e.target.closest('[data-tg-swipe-archive]'); if (!sa) return;
+    e.preventDefault(); e.stopPropagation();
+    const id = sa.dataset.id; swClear(false); if (id) { navigator.vibrate?.(10); archiveChat(id); }
+  });
   listen('click', e => {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
@@ -579,7 +633,9 @@ function start() {
     let stream = null, mr = null, chunks = [];
     return {
       async start() {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        // No echo cancellation / noise suppression / auto gain: on a phone any of them switch the mic to voice-call
+        // mode, which pauses or ducks music playing in another app. A voice note is only listened to and transcribed.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 1 } } });
         const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg'].find(t => window.MediaRecorder?.isTypeSupported?.(t)) || '';
         mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
         mr.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
@@ -598,7 +654,8 @@ function start() {
     if (rec) return;
     if (!navigator.mediaDevices?.getUserMedia) return showErr('Voice isn’t available here.');
     try {
-      const v = P.WizCore?.voice ? P.WizCore.voice({ onState() {}, onLevel() {} }) : plainRecorder();
+      // Phones use the plain recorder: the shell's keeps echo cancellation on phones, which stops the owner's music.
+      const v = P.WizCore?.voice && !PHONE ? P.WizCore.voice({ onState() {}, onLevel() {} }) : plainRecorder();
       rec = { v, at: Date.now() };
       paintComposer();
       await v.start();
