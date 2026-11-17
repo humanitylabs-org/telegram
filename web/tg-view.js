@@ -189,7 +189,9 @@ function isWorking(s) { return WORKING.has(String(s?.status || '')); }
 function needsYou(s) { return ['waiting_for_approval', 'unknown'].includes(s?.status) || s?.attention?.state === 'needs_you'; }
 function failed(s) { return s?.status === 'failed' || s?.status === 'interrupted'; }
 function stamp(host, s) { try { return host.live?.cardAt?.(s) || s.updatedAt || s.lastUserAt; } catch (_) { return s.updatedAt; } }
-function archived(host, s) { try { return !!host.live?.inArchive?.(s); } catch (_) { return !!s.archived; } }
+// The owner's Archive wins here: the shared rule keeps a working, failed or interrupted thread out of the archive
+// even after he archived it, which made the button look like it did nothing. Only a thread waiting on him stays out.
+function archived(host, s) { if (s?.archived && s.status !== 'waiting_for_approval') return true; try { return !!host.live?.inArchive?.(s); } catch (_) { return !!s.archived; } }
 
 export default {
   contract: 'wizard.chats-view/1', id: 'telegram', name: 'Telegram Style',

@@ -279,7 +279,12 @@ function start() {
     if (nextKey && wide()) { if (nextKey.startsWith('note:')) openNote(nextKey.slice(5)); else open(nextKey); } else close();
     try {
       if (note) { const id = cur.slice(5); NOTES.done(id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); }
-      else Promise.resolve(LIVE.archive(cur)).catch(e => showErr(e.message || "Couldn't archive it. Try again."));
+      else {
+        // LIVE.archive answers false (no throw) when the write failed or another write on that chat is still going; retry once.
+        const fail = e => showErr(e?.message || "Couldn't archive it. Try again.");
+        const go = () => Promise.resolve(LIVE.archive(cur));
+        go().then(ok => ok !== false || LIVE.session(cur)?.archived ? null : new Promise(r => setTimeout(r, 1200)).then(go).then(ok2 => { if (ok2 === false && !LIVE.session(cur)?.archived) fail(); })).catch(fail);
+      }
     } catch (e) { showErr(e?.message || "Couldn't archive it. Try again."); }
   }
   new MutationObserver(markActive).observe(listPane, { childList: true, subtree: true });
@@ -302,7 +307,12 @@ function start() {
     const p = donePress; donePress = null;
     if (!p || p.id !== thread || Date.now() - p.t > 1500 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 30) return;
     try { doneAndNext(); } catch (err) { console.error(err); }
+    // The chat is gone from under the finger now, so the click that follows would land on the list
+    // (a chat row or Archived Chats) and open it. Swallow that one click.
+    ghostUntil = Date.now() + 700;
   }, true);
+  let ghostUntil = 0;
+  addEventListener('click', e => { if (Date.now() < ghostUntil) { ghostUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
   listen('click', e => {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
