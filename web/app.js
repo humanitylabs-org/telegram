@@ -234,12 +234,15 @@ function start() {
   const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
   const WIDE = matchMedia('(min-width: 760px)'), wide = () => WIDE.matches;
   const listen = (type, fn, target = root) => target.addEventListener(type, e => { try { fn(e); } catch (err) { console.error(err); } });
+  const HELD = new Map(), HOLD_MS = 60000;
+  const held = id => { const t = HELD.get(id); if (t && Date.now() - t < HOLD_MS) return true; if (t) HELD.delete(id); return false; };
   const host = {
     contract: 'wizard.chats-view/1', windowId: 'telegram-app', region: 'main',
     get thread() { return wide() ? null : thread; },
     get threads() { return (LIVE.sessions || []).filter(s => !s.hidden && !LIVE.agentOf?.(s.id)); },
     live: LIVE,
-    isUnread: s => !!LIVE.isNew?.(s),
+    held: id => held(id),
+    isUnread: s => !held(s.id) && !!LIVE.isNew?.(s),
     emoji: s => topicEmoji(s) || (() => { try { return P.WosTopicEmoji?.get(`thread:${s.id}`, [s.attention?.subject, s.title, s.preview].filter(Boolean).join(' ')); } catch (_) { return ''; } })(),
     openThread: id => open(id), back: () => close(), renderDefault: () => paintThread(),
     // The window's CSP blocks <style> tags, so the view's stylesheet is adopted instead (no second copy shipped).
@@ -272,8 +275,13 @@ function start() {
   // Leaves the screen first, then writes: a throw or slow write never keeps the chat open, and a repeat
   // (finger lift + its click, or a double tap) within a moment never archives the next chat too.
   // LIVE.archive answers false (no throw) when the write failed or another write on that chat is still going; retry once.
+  // Wizard's list answers with the old state for ~15 s after an archive write (its server listing refreshes
+  // in the background), and the shared store stops overriding as soon as one fresh read lands. The next poll
+  // then put the chat back in the list, so archiving looked like it only sometimes worked. Hold it out of
+  // the list here for a minute (well past that lag); sending in it or a failed write lets it back at once.
   function archiveChat(id) {
-    const fail = e => showErr(e?.message || "Couldn't archive it. Try again.");
+    HELD.set(id, Date.now()); instance?.update?.();
+    const fail = e => { HELD.delete(id); instance?.update?.(); showErr(e?.message || "Couldn't archive it. Try again."); };
     const go = () => Promise.resolve(LIVE.archive(id));
     try { go().then(ok => ok !== false || LIVE.session(id)?.archived ? null : new Promise(r => setTimeout(r, 1200)).then(go).then(ok2 => { if (ok2 === false && !LIVE.session(id)?.archived) fail(); })).catch(fail); }
     catch (e) { fail(e); }
@@ -615,7 +623,7 @@ function start() {
     closeMenu();
     if (act === 'rename') renameBox(id);
     if (act === 'read') { try { LIVE.markSeen(id); } catch (_) {} instance.update(); }
-    if (act === 'archive') Promise.resolve(LIVE.archive(id)).catch(e => showErr(e.message));
+    if (act === 'archive') archiveChat(id);
   }
   function renameBox(id) {
     closeMenu();
@@ -715,6 +723,7 @@ function start() {
 
   /* ---------- sending ---------- */
   async function send() {
+    if (thread) HELD.delete(thread);
     const ta = root.querySelector('.ch-compose textarea'); const text = (ta?.value || '').trim();
     if (tray.some(f => f.uploading)) return showErr('Wait for the file to finish uploading.');
     const ids = tray.map(f => f.id).filter(Boolean);
@@ -744,7 +753,13 @@ function start() {
     } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
     finally { sending = false; }
   }
-  function showErr(text) { const err = root.querySelector('.tg-err'); if (err) { err.textContent = text; setTimeout(() => { if (err.textContent === text) err.textContent = ''; }, 6000); } else console.warn(text); }
+  function showErr(text) {
+    const err = [...root.querySelectorAll('.tg-err')].find(e => e.getClientRects().length) || null;
+    if (err) { err.textContent = text; setTimeout(() => { if (err.textContent === text) err.textContent = ''; }, 6000); return; }
+    // No chat on screen (the phone list after Archive closed it): say it in a toast over the list.
+    let t = root.querySelector('.tg-toast'); if (!t) { t = document.createElement('p'); t.className = 'tg-toast'; t.setAttribute('role', 'status'); root.append(t); }
+    t.textContent = text; clearTimeout(t._h); t._h = setTimeout(() => t.remove(), 6000);
+  }
   function focusComposer() { const ta = root.querySelector('.ch-compose textarea'); if (ta && matchMedia('(pointer: fine)').matches) ta.focus(); }
   // Telegram's one round button: a mic while the box is empty, Send once there is something to send (plus a mic
   // beside it while only attachments wait).
