@@ -316,32 +316,43 @@ function start() {
   }, true);
   let ghostUntil = 0;
   addEventListener('click', e => { if (Date.now() < ghostUntil) { ghostUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
-  // Swipe a chat left in the list (phone): an Archive button slides out from the right and the chat is archived only
-  // when that button is tapped. A short swipe springs back; a tap or scroll anywhere else closes it without opening anything.
-  const SW = 88, SWIPE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>';
+  // Swipe a chat left in the list (phone), like Telegram: a short swipe opens an Archive button behind the row (tap it
+  // to archive); a long swipe, past about half the row, archives straight away (a buzz marks the point). A small
+  // swipe springs back; a tap or scroll anywhere else closes the button without opening anything.
+  const SW = 84, SWIPE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>';
   let sw = null, swOpen = null, swAct = null;
   const swRow = id => [...listPane.querySelectorAll('[data-chopen]')].find(r => r.dataset.chopen === id && r.getClientRects().length);
   const swAllowed = () => !thread || wide() ? !listPane.querySelector('[data-tg-archive-back]') : false;
-  function swPaint(id, dx, anim) {
+  const swFull = r => Math.max(170, r.offsetWidth * 0.5);
+  // The action lives in the list's scroller, right under the row, flush with the row's right edge.
+  function swPaint(id, dx, anim, full = false) {
     const r = swRow(id); if (!r) { swClear(false); return; }
-    r.style.transition = anim ? 'transform .18s ease' : 'none'; r.style.transform = dx ? `translateX(${dx}px)` : '';
-    if (!swAct) { swAct = document.createElement('button'); swAct.type = 'button'; swAct.className = 'tg-swipe-act'; swAct.dataset.tgSwipeArchive = ''; swAct.setAttribute('aria-label', 'Archive'); swAct.innerHTML = SWIPE_ICON + '<span>Archive</span>'; }
-    if (!swAct.isConnected) listPane.append(swAct);
-    const b = r.getBoundingClientRect(), right = b.right - dx, w = Math.max(0, -dx - 6);
-    swAct.dataset.id = id; swAct.style.transition = anim ? 'left .18s ease, width .18s ease' : 'none';
-    Object.assign(swAct.style, { top: b.top + 'px', height: b.height + 'px', left: (right - w) + 'px', width: w + 'px' });
+    r.style.transition = anim ? 'transform .2s ease' : 'none'; r.style.transform = dx ? `translateX(${dx}px)` : '';
+    if (!swAct) { swAct = document.createElement('button'); swAct.type = 'button'; swAct.className = 'tg-swipe-act'; swAct.dataset.tgSwipeArchive = ''; swAct.setAttribute('aria-label', 'Archive'); swAct.innerHTML = `<span class="tg-swipe-in">${SWIPE_ICON}<span>Archive</span></span>`; }
+    const box = r.offsetParent || r.parentElement;
+    if (swAct.parentElement !== box) box.append(swAct);
+    const w = Math.max(0, -dx), right = r.offsetLeft + r.offsetWidth;
+    swAct.dataset.id = id; swAct.classList.toggle('full', full);
+    swAct.style.transition = anim ? 'left .2s ease, width .2s ease' : 'none';
+    Object.assign(swAct.style, { top: r.offsetTop + 'px', height: r.offsetHeight + 'px', left: (right - w) + 'px', width: w + 'px' });
   }
   function swClear(anim) {
     const id = swOpen || sw?.id; swOpen = null;
-    const r = id && swRow(id); if (r) { r.style.transition = anim ? 'transform .18s ease' : 'none'; r.style.transform = ''; }
+    const r = id && swRow(id); if (r) { r.style.transition = anim ? 'transform .2s ease' : 'none'; r.style.transform = ''; }
     swAct?.remove();
+  }
+  function swArchive(id) {
+    const r = swRow(id); swOpen = null;
+    if (r) swPaint(id, -r.offsetWidth - 12, true, true);
+    navigator.vibrate?.(10); archiveChat(id);
+    setTimeout(() => { const still = swRow(id); if (still) { still.style.transition = 'transform .2s ease'; still.style.transform = ''; } swAct?.remove(); }, 900);
   }
   new MutationObserver(() => { if (swOpen && !sw) swPaint(swOpen, -SW, false); }).observe(listPane, { childList: true, subtree: true });
   listen('touchstart', e => {
     sw = null;
     if (e.touches.length !== 1 || e.target.closest('[data-tg-swipe-archive]')) return;
     const row = e.target.closest('[data-chopen]'), t = e.touches[0];
-    sw = { id: row && swAllowed() ? row.dataset.chopen : null, x: t.clientX, y: t.clientY, lock: null, moved: false, cur: 0 };
+    sw = { id: row && swAllowed() ? row.dataset.chopen : null, x: t.clientX, y: t.clientY, lock: null, moved: false, cur: 0, full: false };
     sw.base = sw.id && swOpen === sw.id ? -SW : 0;
   });
   listen('touchmove', e => {
@@ -352,12 +363,20 @@ function start() {
     e.preventDefault();
     if (swOpen && swOpen !== sw.id) swClear(true);
     sw.moved = true;
-    let x = Math.min(0, sw.base + dx); if (x < -SW) x = -SW - (-SW - x) * 0.3;
-    sw.cur = x; swPaint(sw.id, x, false);
+    const r = swRow(sw.id); if (!r) return;
+    const x = Math.max(-r.offsetWidth, Math.min(0, sw.base + dx)), full = -x >= swFull(r);
+    if (full !== sw.full) { sw.full = full; navigator.vibrate?.(8); }
+    sw.cur = x; swPaint(sw.id, x, false, full);
   });
   listen('touchend', e => {
     const s = sw; sw = null; if (!s) return;
-    if (s.moved) { ghostUntil = Date.now() + 400; if (s.cur < -SW / 2) { swOpen = s.id; swPaint(s.id, -SW, true); } else { swOpen = s.id; swClear(true); } return; }
+    if (s.moved) {
+      ghostUntil = Date.now() + 400;
+      if (s.full) swArchive(s.id);
+      else if (s.cur < -SW / 2) { swOpen = s.id; swPaint(s.id, -SW, true); }
+      else { swOpen = s.id; swClear(true); }
+      return;
+    }
     if (swOpen && !e.target.closest('[data-tg-swipe-archive]')) { swClear(true); if (s.lock !== 'y') ghostUntil = Date.now() + 700; }
   });
   listen('touchcancel', () => { if (sw?.moved) { swOpen = sw.id; swClear(true); } sw = null; });
@@ -365,7 +384,7 @@ function start() {
   listen('click', e => {
     const sa = e.target.closest('[data-tg-swipe-archive]'); if (!sa) return;
     e.preventDefault(); e.stopPropagation();
-    const id = sa.dataset.id; swClear(false); if (id) { navigator.vibrate?.(10); archiveChat(id); }
+    const id = sa.dataset.id; if (id) swArchive(id); else swClear(false);
   });
   listen('click', e => {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
