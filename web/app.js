@@ -268,12 +268,19 @@ function start() {
     if (next && rowKey(next) !== thread) { next.click(); next.scrollIntoView({ block: 'nearest' }); }
   }
   // ⌥E (or the header's archive button): archive the open chat (or clear the open notification) and open the next row, like the AI apps view.
+  // Leaves the screen first, then writes: a throw or slow write never keeps the chat open, and a repeat
+  // (finger lift + its click, or a double tap) within a moment never archives the next chat too.
+  let doneAt = 0;
   function doneAndNext() {
     if (!thread || thread === '__new__') return;
+    const now = Date.now(); if (now - doneAt < 700) return; doneAt = now;
     const rows = listRows(), i = rows.findIndex(r => rowKey(r) === thread), after = rows[i + 1] || rows[i - 1] || null, nextKey = after && rowKey(after);
-    if (isNote()) { const id = thread.slice(5); NOTES.done(id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); }
-    else { const id = thread; Promise.resolve(LIVE.archive(id)).catch(e => showErr(e.message)); }
+    const cur = thread, note = isNote();
     if (nextKey && wide()) { if (nextKey.startsWith('note:')) openNote(nextKey.slice(5)); else open(nextKey); } else close();
+    try {
+      if (note) { const id = cur.slice(5); NOTES.done(id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); }
+      else Promise.resolve(LIVE.archive(cur)).catch(e => showErr(e.message || "Couldn't archive it. Try again."));
+    } catch (e) { showErr(e?.message || "Couldn't archive it. Try again."); }
   }
   new MutationObserver(markActive).observe(listPane, { childList: true, subtree: true });
   const syncTheme = () => { if (listPane.dataset.tgTheme) threadPane.dataset.tgTheme = listPane.dataset.tgTheme; };
@@ -286,6 +293,16 @@ function start() {
   show();
 
   /* ---------- events ---------- */
+  // The archive / Done button acts on the finger lift, not only on click: a live repaint or the phone keyboard
+  // closing between press and lift used to move or replace the button, and the browser then sent no click.
+  let donePress = null;
+  listen('pointerdown', e => { donePress = e.button === 0 && e.target.closest('[data-tg-done]') ? { x: e.clientX, y: e.clientY, t: Date.now(), id: thread } : null; });
+  listen('pointercancel', () => { donePress = null; });
+  addEventListener('pointerup', e => {
+    const p = donePress; donePress = null;
+    if (!p || p.id !== thread || Date.now() - p.t > 1500 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 30) return;
+    try { doneAndNext(); } catch (err) { console.error(err); }
+  }, true);
   listen('click', e => {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
@@ -732,7 +749,13 @@ function start() {
     const cur = threadPane.querySelector('.ch-thread[data-tg-for]');
     const reuse = cur && cur.querySelector('.tg-composer') && cur.dataset.tgFor === thread;
     if (reuse) {
-      cur.querySelector('.ch-head').outerHTML = head;
+      // Patch the header in place so its buttons stay the same nodes a finger may be pressing.
+      const h = cur.querySelector('.ch-head');
+      h.querySelector('.ti b').textContent = cleanTitle(s?.title) || 'New chat';
+      const sub = h.querySelector('.tg-sub'); sub.textContent = status; sub.classList.toggle('on', !!working);
+      const stop = h.querySelector('[data-tg-stop]');
+      if (working && !stop) h.insertAdjacentHTML('beforeend', '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>');
+      else if (!working && stop) stop.remove();
       cur.querySelector('.ch-msgs').innerHTML = body;
       cur.querySelector('.tg-apbox').innerHTML = approvalHtml();
     } else threadPane.innerHTML = `<div class="ch-thread" data-tg-for="${esc(thread)}">
