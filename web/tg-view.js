@@ -310,8 +310,8 @@ export default {
       }
       root.append(sc);
       const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.title = 'New chat (⌥N)'; fab.append(svg(host, ICON.pencil));
-      // (the desktop sidebar has its own + right below: our pencil would have no window to open a draft in)
-      if (el.closest('.win')) wrap.append(root, fab); else wrap.append(root);
+      // The pencil always shows, on phone and desktop (Miguel, 18 Nov 2026); a folded narrow list hides it via CSS.
+      wrap.append(root, fab);
       const keep = el.querySelector('.tg-scroll')?.scrollTop || 0;
       el.replaceChildren(wrap);
       sc.scrollTop = keep;
