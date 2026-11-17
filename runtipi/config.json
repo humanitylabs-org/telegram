@@ -1,5 +1,5 @@
 {
-  "name": "Telegram Style",
+  "name": "Telegram",
   "id": "telegram",
   "wizard_type": "service",
   "available": true,
@@ -10,8 +10,8 @@
     "utilities"
   ],
   "description": "Your Wizard chats with Telegram's look.",
-  "tipi_version": 23,
-  "version": "0.8.8",
+  "tipi_version": 24,
+  "version": "0.8.9",
   "source": "https://github.com/oscarhenrycollins/telegram",
   "exposable": false,
   "supported_architectures": [
@@ -19,7 +19,7 @@
     "arm64"
   ],
   "created_at": 1791500000000,
-  "updated_at": 1794891824584,
+  "updated_at": 1794911283155,
   "dynamic_config": true,
   "min_tipi_version": "4.8.0",
   "uid": 1000,
