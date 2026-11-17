@@ -66,7 +66,7 @@ function rich(text) {
   const flush = () => { if (buf.length) { out += md(buf.join('\n')); buf = []; } };
   for (const line of String(text).split('\n')) {
     const m = line.match(IMG_LINE);
-    if (m) { flush(); out += `<a class="tg-img" href="${esc(m[2])}" target="_blank" rel="noopener"><img src="${esc(m[2])}" alt="${esc(m[1] || 'Image')}" loading="lazy"></a>`; }
+    if (m) { flush(); out += `<a class="tg-img" role="button" tabindex="0" data-full="${esc(m[2])}"><img src="${esc(m[2])}" alt="${esc(m[1] || 'Image')}" loading="lazy"></a>`; }
     else buf.push(line);
   }
   flush(); return out;
@@ -155,7 +155,7 @@ function saveTx() { try { const k = Object.keys(TX); if (k.length > 600) for (co
 function retryWords(url) { delete txState[url]; delete TX[url]; paintWords(url); }
 function fileHtml(f) {
   const mime = String(f.mime || '');
-  if (mime.startsWith('image/')) return `<a class="tg-img" href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`;
+  if (mime.startsWith('image/')) return `<a class="tg-img" role="button" tabindex="0" data-full="${esc(f.url)}"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`;
   if (mime.startsWith('audio/') || /^wizard-voice-/.test(f.name || '')) { voiceLength(f.url); const d = VDUR[f.url]; return `<button type="button" class="tg-vnote" data-tg-vnote="${esc(f.url)}" aria-label="Play voice message"><span class="tg-vp"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg><i></i></span><span class="tg-vw"><span class="tg-vbar"><b></b></span><span class="tg-vd">${d ? mmss(d) : '…'}</span></span></button>${txHtml(f.url)}`; }
   return `<a class="tg-file" href="${esc(f.url)}" target="_blank" rel="noopener"><i>📄</i><span>${esc(f.name)}</span></a>`;
 }
@@ -381,6 +381,19 @@ function start() {
   });
   listen('touchcancel', () => { if (sw?.moved) { swOpen = sw.id; swClear(true); } sw = null; });
   listPane.addEventListener('scroll', () => { if (swOpen && !sw?.moved) swClear(true); }, true);
+  // A tapped photo opens in Wizard's own media viewer (pinch/double-tap zoom, swipe between the chat's photos, Save,
+  // Share, Back closes it). It used to be a target=_blank link, which the Android app never shows, so a tap did nothing.
+  listen('click', e => {
+    const a = e.target.closest('a.tg-img'); if (!a) return;
+    const all = [...(a.closest('.tg-msgs, .ch-msgs, main, section') || root).querySelectorAll('a.tg-img')].filter(x => x.getClientRects().length);
+    const items = all.map(x => ({ url: new URL(x.dataset.full, location.href).href, kind: 'image', name: x.querySelector('img')?.alt || 'Photo' }));
+    const at = Math.max(0, all.indexOf(a));
+    let shown = false;
+    try { shown = KIT?.viewer?.open?.(items, at) === true; } catch (_) { shown = false; }
+    if (!shown) { try { shown = window.WizardApp?.media?.view?.(items, at) === true; } catch (_) { shown = false; } }
+    e.preventDefault(); e.stopPropagation();
+    if (!shown) window.open(items[at].url, '_blank', 'noopener');
+  });
   listen('click', e => {
     const sa = e.target.closest('[data-tg-swipe-archive]'); if (!sa) return;
     e.preventDefault(); e.stopPropagation();
