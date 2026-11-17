@@ -310,7 +310,8 @@ export default {
       }
       root.append(sc);
       const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.title = 'New chat (⌥N)'; fab.append(svg(host, ICON.pencil));
-      wrap.append(root, fab);
+      // (the desktop sidebar has its own + right below: our pencil would have no window to open a draft in)
+      if (el.closest('.win')) wrap.append(root, fab); else wrap.append(root);
       const keep = el.querySelector('.tg-scroll')?.scrollTop || 0;
       el.replaceChildren(wrap);
       sc.scrollTop = keep;
@@ -342,7 +343,12 @@ export default {
       if (f) { folder = f.dataset.tgFolder; list(); return; }
       const n = e.target.closest('[data-tg-note]'); if (n) { host.notes?.open?.(n.dataset.tgNote); return; }
       if (e.target.closest('[data-tg-archive]')) { inArchive = true; list(); return; }
-      if (e.target.closest('[data-tg-archive-back]')) { inArchive = false; list(); }
+      if (e.target.closest('[data-tg-archive-back]')) { inArchive = false; list(); return; }
+      // Outside a Chats window (the desktop AI apps sidebar, wizard-ux issue 1443) no shell window handler sees our
+      // rows' taps, so a row opens through the contract: the shell routes it to the main chat (Miguel, 17 Nov 2026).
+      if (el.closest('.win')) return;
+      const row = e.target.closest('[data-chopen]');
+      if (row) { e.stopPropagation(); host.openThread(row.dataset.chopen); }
     });
     host.listen('input', e => {
       if (!e.target.matches?.('[data-tg-search]')) return;
