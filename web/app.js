@@ -389,6 +389,43 @@ function start() {
   });
   listen('touchcancel', () => { if (sw?.moved) { swOpen = sw.id; swClear(true); } sw = null; });
   listPane.addEventListener('scroll', () => { if (swOpen && !sw?.moved) swClear(true); }, true);
+
+  function shellViewerVisible() {
+    try { const v = P?.document?.querySelector('.mviewer'); if (!v) return true; const r = v.getBoundingClientRect(); return !v.hidden && r.width > 0 && r.height > 0; } catch (_) { return true; }
+  }
+  // Fallback viewer: full screen over this window, the photo fit to the screen; swipe or the arrows for the chat's other
+  // photos; ✕, a tap on the dark edge, or Back closes it.
+  let ov = null;
+  function ownViewer(items, at) {
+    closeOwnViewer();
+    let i = at;
+    ov = document.createElement('div'); ov.className = 'tg-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Photo');
+    ov.innerHTML = '<button type="button" class="tg-ov-x" aria-label="Close">✕</button><img alt=""><button type="button" class="tg-ov-prev" aria-label="Previous">‹</button><button type="button" class="tg-ov-next" aria-label="Next">›</button>';
+    const img = ov.querySelector('img'), many = items.length > 1;
+    ov.querySelector('.tg-ov-prev').hidden = ov.querySelector('.tg-ov-next').hidden = !many;
+    const show = () => { img.src = items[i].url; img.alt = items[i].name || 'Photo'; };
+    const go = d => { if (many) { i = (i + d + items.length) % items.length; show(); } };
+    ov.addEventListener('click', e => {
+      e.stopPropagation();
+      if (e.target.closest('.tg-ov-prev')) return go(-1);
+      if (e.target.closest('.tg-ov-next')) return go(1);
+      if (e.target === img) return;
+      closeOwnViewer();
+    });
+    let sx = null, sy = 0;
+    ov.addEventListener('touchstart', e => { if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; } else sx = null; }, { passive: true });
+    ov.addEventListener('touchend', e => {
+      if (sx == null) return; const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; sx = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1); else if (dy > 110) closeOwnViewer();
+    });
+    show(); document.body.appendChild(ov);
+    try { ov.__back = window.WizardApp?.back?.push?.(() => { closeOwnViewer(); return true; }); } catch (_) {}
+  }
+  function closeOwnViewer() {
+    if (!ov) return; const o = ov; ov = null; o.remove();
+    try { o.__back?.release?.(); } catch (_) {}
+  }
+  addEventListener('keydown', e => { if (ov && e.key === 'Escape') closeOwnViewer(); });
   // A tapped photo opens in Wizard's own media viewer (pinch/double-tap zoom, swipe between the chat's photos, Save,
   // Share, Back closes it). It used to be a target=_blank link, which the Android app never shows, so a tap did nothing.
   listen('click', e => {
@@ -400,7 +437,10 @@ function start() {
     try { shown = KIT?.viewer?.open?.(items, at) === true; } catch (_) { shown = false; }
     if (!shown) { try { shown = window.WizardApp?.media?.view?.(items, at) === true; } catch (_) { shown = false; } }
     e.preventDefault(); e.stopPropagation();
-    if (!shown) window.open(items[at].url, '_blank', 'noopener');
+    // 0.8.11: an app opened from its own home-screen icon hides Wizard's viewer (it says it opened, nothing shows), so
+    // check it is really on screen; if not, close it and show the photo in this window's own viewer.
+    if (shown && !shellViewerVisible()) { try { KIT?.viewer?.close?.(); } catch (_) {} shown = false; }
+    if (!shown) ownViewer(items, at);
   });
   listen('click', e => {
     const sa = e.target.closest('[data-tg-swipe-archive]'); if (!sa) return;

@@ -168,3 +168,12 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-pane-list .tg-scroll .tg-row { position: relative; z-index: 1; }
 .tg-pane-list .tg-scroll .tg-row:not(.tg-active) { background: var(--tg-bg); touch-action: pan-y; }
 .tg-pane-list .tg-scroll .tg-row:not(.tg-active):hover, .tg-pane-list .tg-scroll .tg-row:not(.tg-active):active { background: var(--tg-hover); }
+
+/* 0.8.11: the photo viewer used when Wizard's own viewer can't show (an app opened from its home-screen icon) */
+.tg-ov { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .96); display: grid; place-items: center; touch-action: pan-x pan-y pinch-zoom; }
+.tg-ov img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; }
+.tg-ov button { position: absolute; border: 0; color: #fff; background: rgba(255, 255, 255, .14); border-radius: 50%; width: 44px; height: 44px; font-size: 22px; line-height: 44px; padding: 0; cursor: pointer; }
+.tg-ov .tg-ov-x { top: calc(env(safe-area-inset-top, 0px) + 12px); left: 12px; }
+.tg-ov .tg-ov-prev { left: 10px; top: 50%; transform: translateY(-50%); }
+.tg-ov .tg-ov-next { right: 10px; top: 50%; transform: translateY(-50%); }
+.tg-ov button[hidden] { display: none; }
