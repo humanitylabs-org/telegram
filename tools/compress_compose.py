@@ -35,8 +35,14 @@ else:
     raw = raw.replace("import base64,json,pathlib,runpy\\n", "import base64,json,pathlib,runpy,sys,zlib\\n", 1)
     raw = raw.replace(f"base64.b64decode('{payload}')", "zlib.decompress(base64.b64decode(''.join(sys.argv[1:])))", 1)
     # the script is the command's last item: add the parts right after it (before the x-runtipi block)
-    i = raw.index("\n    x-runtipi:", raw.index("    command:\n"))
-    raw = raw[:i] + "".join(f"\n    - {p}" for p in parts) + raw[i:]
+    # 0.8.12: insert after the command's last line, whatever key follows it (`wam package-inline` now puts `init: true`
+    # there, and adding the parts after it broke the YAML)
+    lines = raw.split("\n")
+    k = lines.index("    command:") + 1
+    while k < len(lines) and (lines[k].startswith("    - ") or lines[k].startswith("      ")):
+        k += 1
+    lines[k:k] = [f"    - {p}" for p in parts]
+    raw = "\n".join(lines)
     path.write_text(raw)
 cmd = next(iter(yaml.safe_load(path.read_text())["services"].values()))["command"]
 longest = max(len(a) for a in cmd)
