@@ -4,7 +4,7 @@ id: telegram
 name: Telegram
 type: service
 category: app
-version: 0.8.17
+version: 0.8.18
 summary: Your Wizard chats with Telegram's look.
 license: GPL-3.0-only
 source: https://github.com/oscarhenrycollins/telegram
