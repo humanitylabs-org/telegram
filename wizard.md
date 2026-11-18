@@ -7,7 +7,7 @@ category: app
 version: 0.8.19
 summary: Your Wizard chats with Telegram's look.
 license: GPL-3.0-only
-source: https://github.com/oscarhenrycollins/telegram
+source: https://github.com/humanitylabs-org/telegram
 runtime:
   kind: runtipi
   config: runtipi/config.json
