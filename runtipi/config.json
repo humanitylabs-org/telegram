@@ -10,8 +10,8 @@
     "utilities"
   ],
   "description": "Your Wizard chats with Telegram's look.",
-  "tipi_version": 31,
-  "version": "0.8.16",
+  "tipi_version": 32,
+  "version": "0.8.17",
   "source": "https://github.com/oscarhenrycollins/telegram",
   "exposable": false,
   "supported_architectures": [
@@ -19,7 +19,7 @@
     "arm64"
   ],
   "created_at": 1791500000000,
-  "updated_at": 1794959432890,
+  "updated_at": 1794994499392,
   "dynamic_config": true,
   "min_tipi_version": "4.8.0",
   "uid": 1000,
