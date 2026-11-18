@@ -80,7 +80,7 @@ const CSS = `
 .tg-badge { flex: none; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; background: var(--tg-green); }
 .tg-badge.dot { min-width: 12px; width: 12px; height: 12px; padding: 0; margin: 0 5px; }
 .tg-badge.at { background: var(--tg-primary); }
-.tg-askchip { align-self: flex-start; max-width: 100%; box-sizing: border-box; padding: 2px 9px; border-radius: 10px; font-size: 13px; color: var(--tg-primary); background: color-mix(in srgb, var(--tg-primary) 14%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.tg-askchip { align-self: flex-start; max-width: 100%; box-sizing: border-box; padding: 2px 9px; border-radius: 10px; font-size: .8125rem; color: var(--tg-primary); background: color-mix(in srgb, var(--tg-primary) 14%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .tg-askchip:hover { background: color-mix(in srgb, var(--tg-primary) 22%, transparent); }
 .tg-askchip.older { color: var(--tg-sub); background: color-mix(in srgb, var(--tg-sub) 12%, transparent); }
 .tg-badge.err { background: var(--tg-danger); }
