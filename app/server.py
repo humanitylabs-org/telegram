@@ -263,6 +263,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, transcripts(keys if isinstance(keys, list) else []))
             except ValueError:
                 return self.send(400, {'error': 'keys must be a JSON list.'})
+        if path == '/api/features':
+            # Which switches are on, for this app's own page (read-only; changing one stays owner-only /api/switches).
+            return self.send(200, {s['id']: s['on'] for s in switches_doc()['switches']})
         if path == '/api/time':
             return self.send(200, {'utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
         # The view: any file directly in web/, by an allowlisted type. No subpaths, no dotfiles.
@@ -350,7 +353,12 @@ import time as _sw_time
 from pathlib import Path as _SwPath
 from urllib.parse import urlsplit as _sw_urlsplit
 
-SWITCHES = []
+SWITCHES = [
+    {'id': 'newest-preview', 'name': 'Newest reply in the chat list',
+     'description': "Each chat's preview line shows its newest reply's summary; asks still waiting on you get their own "
+                    'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#1']},
+]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
 _SW_LOCAL = {'localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0'}

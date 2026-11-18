@@ -2,6 +2,7 @@
 // approvals all go through the shell's own engine on the parent page (same origin), so this page keeps no
 // messages, tokens or model logic of its own.
 import view, { cleanTitle } from './tg-view.js';
+import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -232,6 +233,7 @@ function start() {
   // Model picker (0.8.19): the shell's own model catalogue and routes (WosModels). A new chat's pick only lasts until
   // it is sent; a thread's pick is saved on the thread the same way Chats does it.
   let newPick = null, modelList = [], modelBusy = false;
+  let jump = null; // { id, mid }: an open-ask chip's message to scroll to once its chat has loaded
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
   root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div>';
   const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
@@ -263,6 +265,39 @@ function start() {
     // device's Chats routing. Tap = mark read there, then open it the way Chats does (or the item's app).
     notes: NOTES,
   };
+  // Switch newest-preview (telegram#1, off by default): rows show the newest reply's summary plus an open-ask chip.
+  // Each row's thread (and its tracker items, when the box keeps them) is read in the background, two at a time,
+  // and again only when the list says the thread changed.
+  const ASKS = new Map(), askQueue = []; let askBusy = 0, askPaint = 0;
+  const askKey = s => [s.messageCount, s.lastAssistantAt, s.lastUserAt, s.previewAt, s.updatedAt].join('|');
+  async function askRead(id) {
+    const rows = await LIVE.messages(id);
+    let items = null;
+    try { const r = await fetch(`/wizard/v1/thread-items?thread=${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (Array.isArray(j?.items)) items = j.items; } } catch (_) {}
+    return askRowInfo(rows, items);
+  }
+  function askPump() {
+    while (askBusy < 2 && askQueue.length) {
+      const id = askQueue.shift(), e = ASKS.get(id); if (!e) continue;
+      askBusy++;
+      askRead(id).then(info => { e.info = info; }, () => { e.info = e.info || { preview: '', needs: false, asks: [] }; })
+        .finally(() => { e.busy = false; askBusy--; askPump(); clearTimeout(askPaint); askPaint = setTimeout(() => { if (!thread || wide()) instance?.update?.(); }, 120); });
+    }
+  }
+  function rowAsks(s) {
+    const key = askKey(s); let e = ASKS.get(s.id);
+    if (!e) { e = { key: '', info: null, busy: false }; ASKS.set(s.id, e); }
+    if (e.key !== key && !e.busy && !WORKING.has(s.status)) { e.key = key; e.busy = true; askQueue.push(s.id); queueMicrotask(askPump); }
+    const info = e.info || { preview: '', needs: false, asks: [] };
+    const a = info.asks[0];
+    return { preview: info.preview, needs: info.needs, chip: a ? { text: chipText(info.asks), mid: a.mid, older: !!a.older && info.asks.length === 1 } : null };
+  }
+  fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
+    if (f?.['newest-preview'] !== true) return;
+    host.rowInfo = rowAsks;
+    host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
+    instance?.update?.();
+  }).catch(() => {});
   instance = view.mount(listPane, host);
   const rowKey = r => r.dataset.chopen || (r.dataset.tgNote ? 'note:' + r.dataset.tgNote : '');
   const listRows = () => [...listPane.querySelectorAll('[data-chopen], [data-tg-note]')].filter(r => r.getClientRects().length);
@@ -935,7 +970,7 @@ function start() {
       const shown = !text ? '' : !lead ? `<div class="tg-text">${text}</div>`
         : `<button type="button" class="tg-rsum" data-tg-rsum="${rk}" aria-expanded="false"${open ? ' hidden' : ''}><span>${esc(/[.!?…"'”’»]$/u.test(lead) ? lead : lead + '.')}</span><i class="tg-chev" aria-hidden="true"></i></button>`
           + `<div class="tg-rdet"${open ? '' : ' hidden'}><div class="tg-text">${text}</div><button type="button" class="tg-rless" data-tg-rsum="${rk}" aria-expanded="true">Show less<i class="tg-chev up" aria-hidden="true"></i></button></div>`;
-      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}${lead ? ' has-rsum' : ''}"><div class="bub">${files}${shown}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
+      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}${lead ? ' has-rsum' : ''}" data-tg-mid="${esc(String(m.id ?? ''))}"><div class="bub">${files}${shown}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
       if (foldOpen && !folded.has(i + 1)) { body += '</details>'; foldOpen = false; }
     }
     body += liveHtml();
@@ -973,6 +1008,11 @@ function start() {
     const ans = root.querySelector('.tg-ap-answer'); if (ans) ans.value = answer;
     const m = root.querySelector('.ch-msgs'); m.scrollTop = keepBottom ? m.scrollHeight : prevTop;
     paintTray(); syncSend();
+    if (jump && jump.id === thread && msgs.length) {
+      const target = [...m.querySelectorAll('[data-tg-mid]')].find(x => x.dataset.tgMid === jump.mid);
+      jump = null;
+      if (target) { const fold = target.closest('details'); if (fold) fold.open = true; target.scrollIntoView({ block: 'center' }); target.classList.add('tg-flash'); setTimeout(() => target.classList.remove('tg-flash'), 1700); }
+    }
     if (typing && !reuse) { const ta = root.querySelector('.ch-compose textarea'); ta.focus({ preventScroll: true }); ta.setSelectionRange(...sel); }
   }
 }
