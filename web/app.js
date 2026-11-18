@@ -5,7 +5,7 @@ import view, { cleanTitle } from './tg-view.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
-const LIVE = P?.WizLive, KIT = P?.WosChat;
+const LIVE = P?.WizLive, KIT = P?.WosChat, MODELS = () => P?.WosModels;
 const WORKING = new Set(['submitting', 'queued', 'running', 'stopping']);
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const PHONE = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
@@ -229,6 +229,9 @@ function start() {
   NOTES.opener = id => openNote(id);
   let thread = null, instance = null, msgs = [], msgSig = '', loading = false, sending = false, draft = '';
   let tray = [], stream = null, streamSnap = null, approval = null, apKey = '', rec = null, recT = null, menu = null;
+  // Model picker (0.8.19): the shell's own model catalogue and routes (WosModels). A new chat's pick only lasts until
+  // it is sent; a thread's pick is saved on the thread the same way Chats does it.
+  let newPick = null, modelList = [], modelBusy = false;
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
   root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div>';
   const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
@@ -451,6 +454,7 @@ function start() {
     if (menu && !e.target.closest('.tg-menu')) closeMenu();
     const mi = e.target.closest('[data-tg-menu]'); if (mi) { menuAct(mi.dataset.tgMenu, mi.dataset.id); return; }
     if (e.target.closest('.tg-menu')) return;
+    const mb = e.target.closest('[data-tg-model]'); if (mb) { openModels(mb); return; }
     if (e.target.closest('[data-tg-done]')) { doneAndNext(); return; }
     const row = e.target.closest('[data-chopen]'); if (row) { open(row.dataset.chopen); return; }
     const na = e.target.closest('[data-tg-noteact]'); if (na) { noteAct(na.dataset.tgNoteact); return; }
@@ -568,7 +572,7 @@ function start() {
     const ta = threadPane.querySelector('.ch-compose textarea'); if (ta) ta.placeholder = 'Reply to start a chat about this';
     paintTray(); syncSend();
   }
-  function close() { recCancel(); unfollow(); thread = null; msgs = []; msgSig = ''; approval = null; show(); }
+  function close() { recCancel(); unfollow(); newPick = null; thread = null; msgs = []; msgSig = ''; approval = null; show(); }
   function paintEmpty() { threadPane.innerHTML = '<div class="ch-thread tg-none"><div class="tg-day"><span>Select a chat to start messaging</span></div></div>'; }
   async function load() {
     if (loading || !thread || thread === '__new__' || isNote()) return;
@@ -637,6 +641,47 @@ function start() {
     menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
   }
   function closeMenu() { menu?.remove(); menu = null; }
+  /* ---------- model picker ---------- */
+  function curRoute() {
+    const M = MODELS(); if (!M) return null;
+    try { return thread === '__new__' || isNote() ? newPick || M.currentRoute('', null) : M.currentRoute(thread, null); } catch (_) { return null; }
+  }
+  function modelLabel() {
+    const M = MODELS(); if (!M) return '';
+    if (modelBusy) return 'Saving…';
+    const r = curRoute(); return r?.model ? M.short(r.model, r.provider) || r.model : 'Model';
+  }
+  function modelChipHtml() { return MODELS() ? `<button type="button" class="tg-model" data-tg-model aria-haspopup="menu" title="Choose the model" aria-label="Model: ${esc(modelLabel())}"><span>${esc(modelLabel())}</span><i class="tg-chev" aria-hidden="true"></i></button>` : ''; }
+  function syncModelChip() {
+    const b = root.querySelector('[data-tg-model]'); if (!b) return;
+    const t = modelLabel(); b.querySelector('span').textContent = t; b.setAttribute('aria-label', `Model: ${t}`);
+  }
+  async function openModels(btn, all = false) {
+    closeMenu();
+    const M = MODELS(); if (!M) return showErr('Models need Wizard · reload it');
+    if (!M.ready) { try { await M.load(); } catch (_) {} syncModelChip(); }
+    if (!M.ready && !M.options.length) return showErr(M.error || 'Could not load models');
+    const cur = curRoute(), keep = thread !== '__new__' && !isNote();
+    const vis = M.visible(cur?.model || '', cur?.provider || '', keep);
+    modelList = all ? M.options : vis;
+    const on = o => cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider);
+    menu = document.createElement('div'); menu.className = 'tg-menu tg-models'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = `<b class="tg-models-h">${thread === '__new__' || isNote() ? 'Model for this new chat' : 'Model for this chat'}</b>`
+      + modelList.map((o, i) => `<button type="button" role="menuitemradio" aria-checked="${!!on(o)}" class="${on(o) ? 'on' : ''}" data-tg-menu="model" data-id="${i}"><span><b>${esc(o.name)}</b><small>${esc([o.description, o.isGlobalDefault ? 'Default' : ''].filter(Boolean).join(' · ') || o.value)}</small></span>${on(o) ? '<i class="tg-ck" aria-hidden="true">✓</i>' : ''}</button>`).join('')
+      + (!all && M.options.length > vis.length ? `<button type="button" class="tg-models-more" data-tg-menu="models-all">More models · ${M.options.length}</button>` : '');
+    root.append(menu);
+    const b = btn.getBoundingClientRect(), r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(b.right - r.width, innerWidth - r.width - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(b.bottom + 6, innerHeight - r.height - 8)) + 'px';
+  }
+  async function pickModel(o) {
+    if (thread === '__new__' || isNote()) { newPick = { model: o.value, provider: o.provider }; syncModelChip(); return; }
+    const M = MODELS(), id = thread; if (!M || !id) return;
+    modelBusy = true; syncModelChip();
+    try { await M.setThreadModel(id, o); }
+    catch (e) { showErr(e.message || 'Model not changed'); }
+    finally { modelBusy = false; if (thread === id) syncModelChip(); }
+  }
   // Attach menu (like Telegram's paperclip): camera, photos/videos or any file, instead of one picker for everything.
   const PICK = { camera: ['image/*', 'environment', false], photos: ['image/*,video/*', '', true], file: ['*/*', '', true] };
   function openAttach(btn) {
@@ -659,6 +704,8 @@ function start() {
   }
   function menuAct(act, id) {
     if (PICK[act]) { closeMenu(); pick(act); return; }
+    if (act === 'models-all') { const b = root.querySelector('[data-tg-model]'); if (b) openModels(b, true); return; }
+    if (act === 'model') { const o = modelList[+id]; closeMenu(); if (o) pickModel(o); return; }
     if (act === 'save') { doRename(id, menu?.querySelector('input')?.value); return; }
     closeMenu();
     if (act === 'rename') renameBox(id);
@@ -787,7 +834,7 @@ function start() {
     msgs.push({ id: 'pending', role: 'user', text, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
     try {
       const opts = fileIds.length ? { fileIds } : {};
-      if (thread === '__new__') { const r = await LIVE.send(text, opts); thread = r.sessionId; root.querySelector('.ch-thread[data-tg-for="__new__"]')?.setAttribute('data-tg-for', thread); if (noteId) NOTES.done(noteId); }
+      if (thread === '__new__') { if (newPick) Object.assign(opts, newPick); const r = await LIVE.send(text, opts); newPick = null; thread = r.sessionId; root.querySelector('.ch-thread[data-tg-for="__new__"]')?.setAttribute('data-tg-for', thread); if (noteId) NOTES.done(noteId); }
       else await LIVE.reply(thread, text, opts);
       msgSig = ''; setTimeout(() => { load(); follow(); }, 700);
     } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
@@ -896,7 +943,7 @@ function start() {
     const working = s && WORKING.has(s.status);
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
     syncTheme();
-    const head = `<div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${thread !== '__new__' ? '<button type="button" class="tg-ibtn tg-headbtn" data-tg-done data-wz-key="e" data-wz-key-label="Archive, then the next chat" title="Archive, then the next chat (⌥E)" aria-label="Archive, then the next chat"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>' : ''}${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>`;
+    const head = `<div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm"></span><div class="ti" data-tg-title title="Tap to rename"><b>${esc(cleanTitle(s?.title) || 'New chat')}</b><span class="tg-sub${working ? ' on' : ''}">${status}</span></div>${modelChipHtml()}${thread !== '__new__' ? '<button type="button" class="tg-ibtn tg-headbtn" data-tg-done data-wz-key="e" data-wz-key-label="Archive, then the next chat" title="Archive, then the next chat (⌥E)" aria-label="Archive, then the next chat"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>' : ''}${working ? '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>' : ''}</div>`;
     // Same chat already on screen: update head, messages and approval in place and keep the composer element.
     // Replacing the textarea mid long-press (the first load lands right after opening) left the phone's
     // Paste bubble attached to a removed box, off screen or dead until the chat was reopened.
@@ -907,6 +954,7 @@ function start() {
       const h = cur.querySelector('.ch-head');
       h.querySelector('.ti b').textContent = cleanTitle(s?.title) || 'New chat';
       const sub = h.querySelector('.tg-sub'); sub.textContent = status; sub.classList.toggle('on', !!working);
+      syncModelChip();
       const stop = h.querySelector('[data-tg-stop]');
       if (working && !stop) h.insertAdjacentHTML('beforeend', '<button type="button" class="tg-stop" data-tg-stop aria-label="Stop" title="Stop">■</button>');
       else if (!working && stop) stop.remove();

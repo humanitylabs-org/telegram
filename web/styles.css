@@ -177,3 +177,18 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-ov .tg-ov-prev { left: 10px; top: 50%; transform: translateY(-50%); }
 .tg-ov .tg-ov-next { right: 10px; top: 50%; transform: translateY(-50%); }
 .tg-ov button[hidden] { display: none; }
+
+/* Model picker (0.8.19): a quiet pill in the chat header, a Telegram-style menu under it. */
+.tg-model { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-left: auto; max-width: 42%; height: 30px; padding: 0 10px 0 12px; border: 0; border-radius: 15px; background: color-mix(in srgb, var(--tg-primary, #8774e1) 16%, transparent); color: var(--tg-primary, #8774e1); font: 600 13.5px var(--tg-font, system-ui); cursor: pointer; }
+.tg-model span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-model .tg-chev { width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.8px 1.8px 0; transform: translateY(-2px) rotate(45deg); flex: none; }
+.tg-model:hover { background: color-mix(in srgb, var(--tg-primary, #8774e1) 24%, transparent); }
+.tg-model + .tg-headbtn { margin-left: 4px; }
+.tg-models { width: min(320px, calc(100vw - 16px)); max-height: min(70vh, 520px); overflow-y: auto; }
+.tg-models-h { padding: 8px 12px 6px; font: 600 13px var(--tg-font, system-ui); color: var(--tg-sub, #8a8a8a); }
+.tg-models > button { display: flex; align-items: center; gap: 10px; }
+.tg-models > button > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tg-models > button small { font-size: 12.5px; font-weight: 400; color: var(--tg-sub, #8a8a8a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-models > button.on b { color: var(--tg-primary, #8774e1); }
+.tg-models .tg-ck { font-style: normal; color: var(--tg-primary, #8774e1); }
+.tg-models .tg-models-more { color: var(--tg-primary, #8774e1); }
