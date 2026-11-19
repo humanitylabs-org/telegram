@@ -14,8 +14,8 @@ from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
-APP_ID = 'telegram'
-VERSION = '0.8.21'
+APP_ID = 'tg-style'
+VERSION = '0.8.22'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -97,7 +97,7 @@ def set_done(habit_id, args):
 TOOLS = [
     {'name': 'wizard_time', 'description': 'Current UTC time on the Wizard box.', 'inputSchema': {'type': 'object', 'properties': {}}},
     {'name': 'wizard_echo', 'description': 'Echo text to prove this app is reachable.', 'inputSchema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}},
-    {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the telegram skill's Ready sweep section says.",
+    {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the tg-style skill's Ready sweep section says.",
      'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
 ]
 
@@ -414,12 +414,12 @@ SWITCHES = [
                     'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
      'default': False, 'issues': ['humanitylabs-org/telegram#1']},
     {'id': 'ready-total', 'name': 'Ready shows its total',
-     'description': 'The number next to Ready counts every chat in Ready, read or unread, instead of only the unread ones.',
-     'default': False, 'issues': []},
+     'description': "The app's badge in Wizard's app list shows how many chats are in Ready, read or unread; the Ready tab no longer shows an unread count.",
+     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'ready-sweep', 'name': 'Sweep button',
      'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
                     'in sensible chunks, so you can archive, answer or keep them in bulk.',
-     'default': False, 'issues': []},
+     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')

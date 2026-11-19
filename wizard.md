@@ -1,10 +1,11 @@
 ---
 wizard: 0.2
-id: telegram
-name: Telegram
+id: tg-style
+renamed_from: [telegram]
+name: TG style
 type: service
 category: app
-version: 0.8.21
+version: 0.8.22
 summary: Your Wizard chats with Telegram's look.
 license: GPL-3.0-only
 source: https://github.com/humanitylabs-org/telegram
@@ -38,6 +39,6 @@ switches:
   path: /api/switches
 ---
 
-# Telegram Style
+# TG style
 
 A different look for the same Wizard chats: Telegram's chat list (folders, avatars, unread badges, archived chats, search) and Telegram-style message bubbles. It opens as a normal app window (desktop and phone) and reads the same threads as Chats through the shell, keeps no messages of its own, and never changes the built-in Chats.

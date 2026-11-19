@@ -43,6 +43,12 @@ const CSS = `
 .tg-sweep { flex: none; height: 32px; padding: 0 12px 0 9px; border-radius: 16px; display: flex; align-items: center; gap: 5px; border: 0; cursor: pointer; background: var(--tg-hover); color: var(--tg-primary); font: inherit; font-size: 14px; font-weight: 600; }
 .tg-sweep svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tg-sweep:hover { filter: brightness(1.15); }
+/* Tapped: the broom sweeps back and forth and a shimmer runs across until the sweep chat opens (Miguel, 19 Nov 2026). */
+.tg-sweep.busy { cursor: progress; background: linear-gradient(90deg, var(--tg-hover) 0%, color-mix(in srgb, var(--tg-primary) 28%, var(--tg-hover)) 50%, var(--tg-hover) 100%) 0 0 / 200% 100%; animation: tg-shimmer 1.1s linear infinite; }
+.tg-sweep.busy svg { transform-origin: 70% 30%; animation: tg-broom .45s ease-in-out infinite alternate; }
+@keyframes tg-shimmer { to { background-position: -200% 0; } }
+@keyframes tg-broom { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+@media (prefers-reduced-motion: reduce) { .tg-sweep.busy, .tg-sweep.busy svg { animation: none; } .tg-sweep.busy { opacity: .7; } }
 .tg-ibtn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--tg-sub); background: none; border: 0; cursor: pointer; }
 .tg-ibtn:active, .tg-ibtn:hover { background: var(--tg-hover); }
 .tg-ibtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -201,7 +207,7 @@ function stamp(host, s) { try { return host.live?.cardAt?.(s) || s.updatedAt || 
 function archived(host, s) { if (s && host.held?.(s.id)) return true; if (s?.archived && s.status !== 'waiting_for_approval') return true; try { return !!host.live?.inArchive?.(s); } catch (_) { return !!s.archived; } }
 
 export default {
-  contract: 'wizard.chats-view/1', id: 'telegram', name: 'Telegram Style',
+  contract: 'wizard.chats-view/1', id: 'tg-style', name: 'TG style',
   mount(el, host) {
     let folder = 'ready', query = '', inArchive = false, sig = '', searchFocus = false;
     mounted++;
@@ -286,7 +292,8 @@ export default {
     function list() {
       const c = counts(), noteMode = folder === 'notes' && !inArchive && !query.trim();
       const rows = noteMode ? [] : pick(), nts = noteMode ? notes() : [];
-      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), host.rowInfo ? JSON.stringify(host.rowInfo(s)) : '']), c]);
+      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, !!host.sweepBusy?.(), nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), host.rowInfo ? JSON.stringify(host.rowInfo(s)) : '']), c]);
+      host.onCounts?.(c);
       if (next === sig && el.querySelector('.tg-list')) return;
       sig = next;
       const wrap = host.element('div'); wrap.className = 'tg-wrap';
@@ -300,8 +307,10 @@ export default {
         // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
         // Switch ready-sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
         if (host.features?.['ready-sweep'] && host.sweep && folder === 'ready' && !query.trim() && rows.length) {
-          const sw = host.element('button'); sw.type = 'button'; sw.className = 'tg-sweep'; sw.dataset.tgSweep = '';
-          sw.title = `Work through all ${rows.length} Ready chats with your agent`; sw.append(svg(host, ICON.sweep), 'Sweep'); top.append(sw);
+          const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
+          sw.disabled = busy; sw.setAttribute('aria-busy', String(busy));
+          sw.title = busy ? 'Starting your sweep…' : `Work through all ${rows.length} Ready chats with your agent`;
+          sw.append(svg(host, ICON.sweep), busy ? 'Sweeping…' : 'Sweep'); top.append(sw);
         }
         if (c.archive) { const ab = host.element('button'); ab.type = 'button'; ab.className = 'tg-ibtn'; ab.dataset.tgArchive = ''; ab.title = 'Archived Chats'; ab.setAttribute('aria-label', 'Archived Chats'); ab.append(svg(host, ICON.archive)); top.append(ab); }
       }
@@ -314,7 +323,8 @@ export default {
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
           t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
-          const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
+          // Switch ready-total: Ready's number lives on the app's own badge in Wizard's app list, not on the tab (Miguel, 19 Nov 2026).
+          const n = id === 'ready' ? (host.features?.['ready-total'] ? 0 : c.ready) : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
         }
