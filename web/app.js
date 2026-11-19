@@ -264,7 +264,26 @@ function start() {
     // Notifications: read straight from the Notifications app (same origin), so the tab never depends on this
     // device's Chats routing. Tap = mark read there, then open it the way Chats does (or the item's app).
     notes: NOTES,
+    features: {},
+    // Ready sweep (switch ready-sweep): save the Ready list the owner sees, then open a new chat that works through it.
+    sweep: rows => startSweep(rows),
   };
+  let sweeping = false;
+  async function startSweep(rows) {
+    if (sweeping || !rows?.length) return;
+    sweeping = true;
+    try {
+      const items = rows.map(s => ({ id: s.id, title: s.title, status: s.status, state: s.attention?.state, ask: s.attention?.ask,
+        preview: s.preview, time: s.lastAssistantAt || s.updatedAt || '', unread: !!LIVE.isNew?.(s) }));
+      const r = await fetch('api/sweep', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+      const sw = await r.json().catch(() => ({}));
+      if (!r.ok || !sw.sweep_id) throw new Error(sw.error || 'Could not start the sweep');
+      const n = sw.count, text = `\u{1F9F9} Sweep my Ready list: ${n} chat${n === 1 ? '' : 's'} (${sw.sweep_id})`;
+      const out = await LIVE.send(text, { instructions: `Ready sweep from the Telegram Style app. Load the telegram skill and follow its Ready sweep section. Get the chats with the telegram app's sweep_list tool, sweep_id ${sw.sweep_id}.` });
+      open(out.sessionId);
+    } catch (e) { showErr(e.message || 'Could not start the sweep'); }
+    finally { sweeping = false; }
+  }
   // Switch newest-preview (telegram#1, off by default): rows show the newest reply's summary plus an open-ask chip.
   // Each row's thread (and its tracker items, when the box keeps them) is read in the background, two at a time,
   // and again only when the list says the thread changed.
@@ -293,6 +312,8 @@ function start() {
     return { preview: info.preview, needs: info.needs, chip: a ? { text: chipText(info.asks), mid: a.mid, older: !!a.older && info.asks.length === 1 } : null };
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
+    host.features = f || {};
+    if (f?.['ready-total'] || f?.['ready-sweep']) instance?.update?.();
     if (f?.['newest-preview'] !== true) return;
     host.rowInfo = rowAsks;
     host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };

@@ -40,6 +40,9 @@ const CSS = `
 .tg-list { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--tg-bg); color: var(--tg-text); font-family: var(--tg-font); }
 .tg-top { flex: none; display: flex; align-items: center; gap: 6px; padding: calc(var(--wos-cutout, 0px) + 8px) 10px 6px; }
 .tg-top h1 { flex: 1; margin: 0 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: .01em; }
+.tg-sweep { flex: none; height: 32px; padding: 0 12px 0 9px; border-radius: 16px; display: flex; align-items: center; gap: 5px; border: 0; cursor: pointer; background: var(--tg-hover); color: var(--tg-primary); font: inherit; font-size: 14px; font-weight: 600; }
+.tg-sweep svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tg-sweep:hover { filter: brightness(1.15); }
 .tg-ibtn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--tg-sub); background: none; border: 0; cursor: pointer; }
 .tg-ibtn:active, .tg-ibtn:hover { background: var(--tg-hover); }
 .tg-ibtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -95,7 +98,7 @@ const CSS = `
 /* Collapsed: a narrow list shows avatars only, with their badges, like Telegram Desktop's folded chat column. */
 .tg-wrap { container-type: inline-size; }
 @container (max-width: 150px) {
-  .tg-top h1, .tg-search, .tg-tabs, .tg-bd, .tg-fab, .tg-empty { display: none; }
+  .tg-top h1, .tg-search, .tg-tabs, .tg-bd, .tg-fab, .tg-empty, .tg-sweep { display: none; }
   .tg-top { justify-content: center; padding-left: 0; padding-right: 0; }
   .tg-scroll { padding: 4px 4px 24px; }
   .tg-row { justify-content: center; padding: 6px 0; position: relative; }
@@ -168,6 +171,7 @@ const ICON = {
   archive: ['M4 7h16v3H4z', 'M5 10v9h14v-9', 'M10 14h4'],
   back: ['M15 5l-7 7 7 7'],
   tick2: ['M2 13l4 4 8-9', 'M10 15l2 2 8-9'],
+  sweep: ['M20 4l-7.5 7.5', 'M10.5 10l3.5 3.5c-.8 3.4-3.2 6-6.5 7.5L3 20l1-4.5C5.5 12.2 7.6 10.4 10.5 10z', 'M7 15.5l2 2'],
 };
 function theme() {
   // Follow the shell, the same way its Appearance host decides: light skins get Telegram's day theme.
@@ -219,7 +223,9 @@ export default {
     }
     function counts() {
       const live = visible().filter(s => !archived(host, s));
-      return { ready: live.filter(s => !isWorking(s) && host.isUnread(s)).length, working: live.filter(isWorking).length,
+      // Switch ready-total: Ready's number is every chat in it, read or not (Miguel, 19 Nov 2026).
+      const total = !!host.features?.['ready-total'];
+      return { ready: live.filter(s => !isWorking(s) && (total || host.isUnread(s))).length, working: live.filter(isWorking).length,
         notes: notesOf(host).filter(i => !i.read).length, archive: visible().length - live.length };
     }
     function notes() {
@@ -280,7 +286,7 @@ export default {
     function list() {
       const c = counts(), noteMode = folder === 'notes' && !inArchive && !query.trim();
       const rows = noteMode ? [] : pick(), nts = noteMode ? notes() : [];
-      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), host.rowInfo ? JSON.stringify(host.rowInfo(s)) : '']), c]);
+      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), host.rowInfo ? JSON.stringify(host.rowInfo(s)) : '']), c]);
       if (next === sig && el.querySelector('.tg-list')) return;
       sig = next;
       const wrap = host.element('div'); wrap.className = 'tg-wrap';
@@ -292,6 +298,11 @@ export default {
       } else {
         const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
         // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
+        // Switch ready-sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
+        if (host.features?.['ready-sweep'] && host.sweep && folder === 'ready' && !query.trim() && rows.length) {
+          const sw = host.element('button'); sw.type = 'button'; sw.className = 'tg-sweep'; sw.dataset.tgSweep = '';
+          sw.title = `Work through all ${rows.length} Ready chats with your agent`; sw.append(svg(host, ICON.sweep), 'Sweep'); top.append(sw);
+        }
         if (c.archive) { const ab = host.element('button'); ab.type = 'button'; ab.className = 'tg-ibtn'; ab.dataset.tgArchive = ''; ab.title = 'Archived Chats'; ab.setAttribute('aria-label', 'Archived Chats'); ab.append(svg(host, ICON.archive)); top.append(ab); }
       }
       root.append(top);
@@ -354,6 +365,7 @@ export default {
       // An open-ask chip sits inside its row: jump to that message instead of only opening the chat.
       const j = e.target.closest('[data-tg-askjump]');
       if (j && host.jumpTo) { e.preventDefault(); e.stopImmediatePropagation(); host.jumpTo(j.dataset.tgAskjump, j.dataset.mid); return; }
+      if (e.target.closest('[data-tg-sweep]')) { e.preventDefault(); e.stopImmediatePropagation(); host.sweep?.(pick()); return; }
       const f = e.target.closest('[data-tg-folder]');
       if (f) { folder = f.dataset.tgFolder; list(); return; }
       const n = e.target.closest('[data-tg-note]'); if (n) { host.notes?.open?.(n.dataset.tgNote); return; }

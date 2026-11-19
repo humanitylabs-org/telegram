@@ -5,6 +5,7 @@ Stdlib only. The host gateway owns authentication; direct ports stay loopback.
 import datetime as dt
 import json
 import os
+import re
 import sqlite3
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'telegram'
-VERSION = '0.8.20'
+VERSION = '0.8.21'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -96,7 +97,57 @@ def set_done(habit_id, args):
 TOOLS = [
     {'name': 'wizard_time', 'description': 'Current UTC time on the Wizard box.', 'inputSchema': {'type': 'object', 'properties': {}}},
     {'name': 'wizard_echo', 'description': 'Echo text to prove this app is reachable.', 'inputSchema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}},
+    {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the telegram skill's Ready sweep section says.",
+     'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
 ]
+
+
+# ---- Ready sweep: the Sweep button saves what the Ready folder showed, so the sweep chat works that exact list ----
+SWEEP_ID = re.compile(r'^sw_[0-9]{8}_[0-9]{6}_[0-9a-f]{6}$')
+
+
+def _sweep_dir():
+    d = DATA / 'sweeps'
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _clip(v, n):
+    return ' '.join(str(v or '').split())[:n]
+
+
+def save_sweep(body):
+    items = body.get('items')
+    if not isinstance(items, list) or not 1 <= len(items) <= 400:
+        raise Problem(400, 'items must list 1 to 400 chats.')
+    rows = []
+    for it in items:
+        if not isinstance(it, dict) or not isinstance(it.get('id'), str) or not 0 < len(it['id']) <= 120:
+            raise Problem(400, 'Each item needs a chat id.')
+        rows.append({'id': it['id'], 'title': _clip(it.get('title'), 120), 'status': _clip(it.get('status'), 40),
+                     'state': _clip(it.get('state'), 20), 'ask': _clip(it.get('ask'), 300), 'preview': _clip(it.get('preview'), 300),
+                     'time': _clip(it.get('time'), 40), 'unread': bool(it.get('unread'))})
+    sid = time.strftime('sw_%Y%m%d_%H%M%S_', time.gmtime()) + os.urandom(3).hex()
+    doc = {'sweep_id': sid, 'created': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'count': len(rows), 'chats': rows}
+    d = _sweep_dir()
+    (d / (sid + '.json')).write_text(json.dumps(doc))
+    for old in sorted(d.glob('sw_*.json'))[:-30]:  # keep the last 30 sweeps
+        old.unlink(missing_ok=True)
+    return {'sweep_id': sid, 'count': len(rows)}
+
+
+def get_sweep(sweep_id=None):
+    d = _sweep_dir()
+    if sweep_id:
+        if not SWEEP_ID.match(str(sweep_id)):
+            raise Problem(400, 'Unknown sweep id.')
+        f = d / (sweep_id + '.json')
+    else:
+        all_ = sorted(d.glob('sw_*.json'))
+        f = all_[-1] if all_ else None
+    if not f or not f.is_file():
+        raise Problem(404, 'No sweep yet: the owner starts one with the Sweep button in the Ready folder.')
+    return json.loads(f.read_text())
 
 
 def rpc(msg):
@@ -124,6 +175,8 @@ def rpc(msg):
                 value = {'utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
             elif n == 'wizard_echo':
                 value = {'text': str(a.get('text', ''))}
+            elif n == 'sweep_list':
+                value = get_sweep(a.get('sweep_id'))
             else:
                 return {'jsonrpc': '2.0', 'id': i, 'error': {'code': -32602, 'message': 'Unknown tool.'}}
             r = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': False}
@@ -303,7 +356,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(415, {'error': 'Use application/json.'})
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if not 0 <= size <= 65536:
+            if not 0 <= size <= (524288 if path == '/api/sweep' else 65536):  # a sweep carries the whole Ready list
                 return self.send(413, {'error': 'Request too large.'})
             body = json.loads(self.rfile.read(size))
             if path == '/mcp':
@@ -322,6 +375,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, set_done(int(parts[3]), body))
             if path == '/api/echo':
                 return self.send(200, {'text': str(body.get('text', ''))})
+            if path == '/api/sweep':
+                return self.send(201, save_sweep(body))
             self.send(404, {'error': 'Not found.'})
         except Problem as e:
             self.send(e.code, {'error': e.message})
@@ -358,6 +413,13 @@ SWITCHES = [
      'description': "Each chat's preview line shows its newest reply's summary; asks still waiting on you get their own "
                     'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
      'default': False, 'issues': ['humanitylabs-org/telegram#1']},
+    {'id': 'ready-total', 'name': 'Ready shows its total',
+     'description': 'The number next to Ready counts every chat in Ready, read or unread, instead of only the unread ones.',
+     'default': False, 'issues': []},
+    {'id': 'ready-sweep', 'name': 'Sweep button',
+     'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
+                    'in sensible chunks, so you can archive, answer or keep them in bulk.',
+     'default': False, 'issues': []},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
