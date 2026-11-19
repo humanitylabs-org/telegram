@@ -284,7 +284,7 @@ function start() {
       const sw = await r.json().catch(() => ({}));
       if (!r.ok || !sw.sweep_id) throw new Error(sw.error || 'Could not start the sweep');
       const n = sw.count, text = `\u{1F9F9} Sweep my Ready list: ${n} chat${n === 1 ? '' : 's'} (${sw.sweep_id})`;
-      const out = await LIVE.send(text, { instructions: `Ready sweep from the Telegram Style app. Load the telegram skill and follow its Ready sweep section. Get the chats with the telegram app's sweep_list tool, sweep_id ${sw.sweep_id}.` });
+      const out = await LIVE.send(text, { instructions: `Ready sweep from the TG style app. Load the tg-style skill and follow its Ready sweep section. Get the chats with the tg-style app's sweep_list tool (mcp__wizard__tg_style__sweep_list), sweep_id ${sw.sweep_id}.` });
       try { localStorage.setItem('tg.lastSweep', JSON.stringify({ id: out.sessionId, at: Date.now() })); } catch (_) {}
       open(out.sessionId);
     } catch (e) { showErr(e.message || 'Could not start the sweep'); }

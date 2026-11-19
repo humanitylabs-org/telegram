@@ -1,5 +1,5 @@
 ---
-name: telegram
+name: tg-style
 description: Use when the owner asks about the Telegram look for his chats.
 version: 0.8.22
 author: Oscar (Hermes Agent)
@@ -10,7 +10,7 @@ metadata:
     tags: [chats, look]
     related_skills: []
 ---
-# TG style (app id telegram)
+# TG style (app id tg-style, formerly telegram)
 
 A Chats view: the owner's Wizard chats drawn like Telegram (chat list with folders, avatars, badges, archived chats, search; Telegram bubbles in threads). It reads the same threads as Chats; the only thing it keeps is the words of voice messages, heard once by the Transcriber app. Long replies open on their short answer, tap to see all. It does not change the built-in Chats; picking it as the default Chats is the owner's choice in Settings. `wizard_echo` proves the app is reachable.
 

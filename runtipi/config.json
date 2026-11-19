@@ -1,6 +1,6 @@
 {
   "name": "TG style",
-  "id": "telegram",
+  "id": "tg-style",
   "wizard_type": "service",
   "available": true,
   "short_desc": "Your Wizard chats with Telegram's look.",

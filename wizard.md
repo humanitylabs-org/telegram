@@ -1,6 +1,7 @@
 ---
 wizard: 0.2
-id: telegram
+id: tg-style
+renamed_from: [telegram]
 name: TG style
 type: service
 category: app

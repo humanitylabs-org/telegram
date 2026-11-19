@@ -207,7 +207,7 @@ function stamp(host, s) { try { return host.live?.cardAt?.(s) || s.updatedAt || 
 function archived(host, s) { if (s && host.held?.(s.id)) return true; if (s?.archived && s.status !== 'waiting_for_approval') return true; try { return !!host.live?.inArchive?.(s); } catch (_) { return !!s.archived; } }
 
 export default {
-  contract: 'wizard.chats-view/1', id: 'telegram', name: 'TG style',
+  contract: 'wizard.chats-view/1', id: 'tg-style', name: 'TG style',
   mount(el, host) {
     let folder = 'ready', query = '', inArchive = false, sig = '', searchFocus = false;
     mounted++;
