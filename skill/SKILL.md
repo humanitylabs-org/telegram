@@ -1,7 +1,7 @@
 ---
 name: telegram
 description: Use when the owner asks about the Telegram look for his chats.
-version: 0.8.21
+version: 0.8.22
 author: Oscar (Hermes Agent)
 license: GPL-3.0-only
 platforms: [linux, macos]
@@ -10,7 +10,7 @@ metadata:
     tags: [chats, look]
     related_skills: []
 ---
-# Telegram Style
+# TG style (app id telegram)
 
 A Chats view: the owner's Wizard chats drawn like Telegram (chat list with folders, avatars, badges, archived chats, search; Telegram bubbles in threads). It reads the same threads as Chats; the only thing it keeps is the words of voice messages, heard once by the Transcriber app. Long replies open on their short answer, tap to see all. It does not change the built-in Chats; picking it as the default Chats is the owner's choice in Settings. `wizard_echo` proves the app is reachable.
 
@@ -18,8 +18,11 @@ A Chats view: the owner's Wizard chats drawn like Telegram (chat list with folde
 
 The Sweep button in the Ready folder (switch `ready-sweep`) saves the Ready list the owner saw and opens a new chat starting "Sweep my Ready list: N chats (sw_…)". In that chat, help him clear the list in bulk, the way a backlog review works: you sort, he decides with one-word replies.
 
-1. Call this app's `sweep_list` with the sweep id from the first message. Before planning, drop any chat that has since been archived or is running again (check each id on the Hermes sessions API: `GET /api/sessions/<id>`, key and port are API_SERVER_KEY / API_SERVER_PORT in ~/.hermes/.env; never print the key).
-2. Know what each chat is waiting on. The saved ask and preview usually say it; when they are vague, read that chat's last assistant message (`GET /api/sessions/<id>/messages?order=newest&limit=3`). Never describe a chat you have not read.
-3. Group into chunks that make sense and label them A, B, C, smallest effort first: finished or FYI chats that only need archiving; things he should try or look at (with the link or step); decisions only he can make (your recommendation plus the reply words); failed or stuck chats (offer a retry); old or duplicate chats. Within a chunk, number every chat on one line: title, what it waits on, your suggestion. Numbered lines are fine here so he can answer "A yes", "B2 archive", "C1 go", "hold".
-4. Act only on his answer, then say what changed and how many are left. Archive with `PATCH /api/sessions/<id>` body `{"archived": true}` (reversible: `false` restores). To pass his decision to a chat's own agent, start a run there with `POST /v1/runs` body `{"session_id": "<id>", "input": "<his words>"}` and tell him it went. "Hold" or "skip" leaves the chat in Ready; bring held ones back at the end.
-5. Never archive, answer or retry anything he has not said yes to, and never touch chats outside the sweep list. Finish with the count still in Ready.
+1. Call this app's `sweep_list` with the sweep id from the first message (call it directly, no tool search needed). Leave out other "Ready sweep" chats. Before planning, drop any chat that has since been archived or is running again.
+2. Hermes sessions API: `http://127.0.0.1:8642` (API_SERVER_PORT is usually not set in ~/.hermes/.env; 8642 is the default), header `Authorization: Bearer $API_SERVER_KEY` from that file, never printed. `GET /api/sessions/<id>` returns `{session: {...}}`; messages are `GET /api/sessions/<id>/messages?order=latest&limit=8`, rows under `data` (order is `oldest` or `latest` only).
+3. Read each chat's last full assistant reply, and its last user message, before describing it. Its status line's `items` list every open ask in that chat: report every one, not only the first. Never describe a chat you have not read.
+4. Check the owning source before calling something open, sent or stuck: a Messenger draft "to send" (`messenger_list_drafts`: no draft left usually means he sent it), an app change (installed version in `~/runtipi/apps/wizardapps/<app>/config.json`), a chat cut off by a restart (read further back: the work may have shipped before the cut). Say what you checked in a few words.
+5. When two chats share a topic (two drafts to the same person), tell them apart by what each one says and its time, not by title order, and say which is newer.
+6. Group into chunks labelled A, B, C, smallest effort first: finished or FYI (archive); things to try or send (with the link); decisions only he can make (your pick plus reply words); failed or stuck (offer a retry). Within a chunk, number every chat on one line: title and date, what it waits on, your suggestion. Plain lines, no bold headings. Numbered lines are fine here so he can answer "A yes", "B2 archive", "C1 go", "hold".
+7. Act only on his answer, then say what changed and how many are left. Archive with `PATCH /api/sessions/<id>` body `{"archived": true}` (reversible: `false` restores). To pass his decision to a chat's own agent, start a run there with `POST /v1/runs` body `{"session_id": "<id>", "input": "<his words>"}` and tell him it went. "Hold" or "skip" leaves the chat in Ready; bring held ones back at the end.
+8. Never archive, answer or retry anything he has not said yes to, and never touch chats outside the sweep list. Finish with the count still in Ready, and offer to archive the sweep chat itself.

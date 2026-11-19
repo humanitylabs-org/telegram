@@ -267,11 +267,16 @@ function start() {
     features: {},
     // Ready sweep (switch ready-sweep): save the Ready list the owner sees, then open a new chat that works through it.
     sweep: rows => startSweep(rows),
+    sweepBusy: () => sweeping,
+    // Switch ready-total: the Ready total rides on this app's badge in Wizard's app list.
+    onCounts: c => { if (!host.features?.['ready-total']) return; const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
-  let sweeping = false;
+  let sweeping = false, lastBadge = -1;
+  // One tap = one sweep: taps while it starts are ignored, and a tap within 2 minutes of the last sweep reopens it.
   async function startSweep(rows) {
     if (sweeping || !rows?.length) return;
-    sweeping = true;
+    try { const last = JSON.parse(localStorage.getItem('tg.lastSweep') || 'null'); if (last && Date.now() - last.at < 120000 && LIVE.session(last.id) && !LIVE.session(last.id).archived) { open(last.id); return; } } catch (_) {}
+    sweeping = true; instance?.update?.();
     try {
       const items = rows.map(s => ({ id: s.id, title: s.title, status: s.status, state: s.attention?.state, ask: s.attention?.ask,
         preview: s.preview, time: s.lastAssistantAt || s.updatedAt || '', unread: !!LIVE.isNew?.(s) }));
@@ -280,9 +285,10 @@ function start() {
       if (!r.ok || !sw.sweep_id) throw new Error(sw.error || 'Could not start the sweep');
       const n = sw.count, text = `\u{1F9F9} Sweep my Ready list: ${n} chat${n === 1 ? '' : 's'} (${sw.sweep_id})`;
       const out = await LIVE.send(text, { instructions: `Ready sweep from the Telegram Style app. Load the telegram skill and follow its Ready sweep section. Get the chats with the telegram app's sweep_list tool, sweep_id ${sw.sweep_id}.` });
+      try { localStorage.setItem('tg.lastSweep', JSON.stringify({ id: out.sessionId, at: Date.now() })); } catch (_) {}
       open(out.sessionId);
     } catch (e) { showErr(e.message || 'Could not start the sweep'); }
-    finally { sweeping = false; }
+    finally { sweeping = false; instance?.update?.(); }
   }
   // Switch newest-preview (telegram#1, off by default): rows show the newest reply's summary plus an open-ask chip.
   // Each row's thread (and its tracker items, when the box keeps them) is read in the background, two at a time,

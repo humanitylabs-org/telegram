@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'telegram'
-VERSION = '0.8.21'
+VERSION = '0.8.22'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -414,7 +414,7 @@ SWITCHES = [
                     'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
      'default': False, 'issues': ['humanitylabs-org/telegram#1']},
     {'id': 'ready-total', 'name': 'Ready shows its total',
-     'description': 'The number next to Ready counts every chat in Ready, read or unread, instead of only the unread ones.',
+     'description': "The app's badge in Wizard's app list shows how many chats are in Ready, read or unread; the Ready tab no longer shows an unread count.",
      'default': False, 'issues': []},
     {'id': 'ready-sweep', 'name': 'Sweep button',
      'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
