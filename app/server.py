@@ -415,11 +415,11 @@ SWITCHES = [
      'default': False, 'issues': ['humanitylabs-org/telegram#1']},
     {'id': 'ready-total', 'name': 'Ready shows its total',
      'description': "The app's badge in Wizard's app list shows how many chats are in Ready, read or unread; the Ready tab no longer shows an unread count.",
-     'default': False, 'issues': []},
+     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'ready-sweep', 'name': 'Sweep button',
      'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
                     'in sensible chunks, so you can archive, answer or keep them in bulk.',
-     'default': False, 'issues': []},
+     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
