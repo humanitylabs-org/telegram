@@ -845,7 +845,8 @@ function start() {
     try {
       // Phones use the plain recorder: the shell's keeps echo cancellation on phones, which stops the owner's music.
       const v = P.WizCore?.voice && !PHONE ? P.WizCore.voice({ onState() {}, onLevel() {} }) : plainRecorder();
-      rec = { v, at: Date.now() };
+      // The note belongs to the chat it was started in, even if he opens another chat before it is sent (Miguel, 20 Nov 2026).
+      rec = { v, at: Date.now(), thread };
       paintComposer();
       await v.start();
       recT = setInterval(() => { const t = root.querySelector('.tg-rec-time'); if (t && rec) t.textContent = fmtTime(Date.now() - rec.at); }, 250);
@@ -865,7 +866,7 @@ function start() {
       for (let i = 0; i < 120 && tray.some(t => t.uploading); i++) await new Promise(r => setTimeout(r, 250));
       const extra = tray.map(t => t.id).filter(Boolean), sent = tray; tray = [];
       paintComposer();
-      try { await deliver((out.text || '').trim() || '🎤 Voice message', [f.id, ...extra]); }
+      try { await deliver((out.text || '').trim() || '🎤 Voice message', [f.id, ...extra], r.thread); }
       catch (e) { tray = sent; paintTray(); throw e; }
     } catch (e) { paintComposer(); showErr(e.message || 'Voice note failed'); }
   }
@@ -882,8 +883,15 @@ function start() {
     try { await deliver(text || '📎', ids); }
     catch (e) { tray = sent; draft = text; paintThread(); const t = root.querySelector('.ch-compose textarea'); if (t && !t.value) t.value = text; syncSend(); showErr(e.message || 'Could not send'); }
   }
-  async function deliver(text, fileIds = []) {
+  async function deliver(text, fileIds = [], target = thread) {
     if (sending) throw new Error('Still sending the last message');
+    // Sent from a chat he has since left (a voice note still uploading or transcribing): reply there, paint nothing here.
+    if (target && target !== thread && !String(target).startsWith('note:')) {
+      sending = true;
+      const opts = fileIds.length ? { fileIds } : {};
+      try { if (target === '__new__') await LIVE.send(text, opts); else await LIVE.reply(target, text, opts); } finally { sending = false; }
+      return;
+    }
     sending = true;
     // A reply to a notification starts a new chat that carries it, then clears the notification.
     let noteId = '', prevThread = thread;
