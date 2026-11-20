@@ -1,0 +1,103 @@
+# python3 -m unittest tests/test_catchup.py
+import importlib.util
+import json
+import os
+import sys
+import tempfile
+import threading
+import unittest
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+
+
+def load(data_dir):
+    os.environ['DATA_DIR'] = data_dir
+    os.environ['WIZARD_SWITCHES_DIR'] = data_dir
+    spec = importlib.util.spec_from_file_location('tg_server', HERE / 'app' / 'server.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def call(srv, name, args):
+    out = srv.rpc({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': name, 'arguments': args}})
+    return out['result']
+
+
+class CatchupTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.srv = load(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_switch_listed_off_with_issue(self):
+        sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
+        self.assertFalse(sw['catch-me-up']['on'])
+        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7'])
+
+    def test_tools_listed(self):
+        names = {t['name'] for t in self.srv.TOOLS}
+        self.assertTrue({'catchup_list', 'catchup_record'} <= names)
+
+    def test_first_then_second_links_previous_and_new_items(self):
+        a = self.srv.save_catchup({'chats': [{'id': 'c1', 'title': 'One'}], 'notifications': [{'id': 7, 'title': 'Bill'}]})
+        self.assertIsNone(a['previous'])
+        first = call(self.srv, 'catchup_list', {})['structuredContent']
+        self.assertIsNone(first['previous_catchup'])
+        self.assertIsNone(first['new_since_previous'])
+        rec = call(self.srv, 'catchup_record', {'catchup_id': a['catchup_id'], 'shown': [{'key': 'chat:c1', 'source': 'ready'}, 'mail:m1'],
+                                                 'decided': [{'key': 'chat:c1', 'decision': 'archive'}]})
+        self.assertFalse(rec['isError'])
+        call(self.srv, 'catchup_record', {'catchup_id': a['catchup_id'], 'shown': ['money:x'], 'append': True})
+        import time; time.sleep(1.1)   # ids sort by the second they were made
+        b = self.srv.save_catchup({'chats': [{'id': 'c1'}, {'id': 'c2'}], 'notifications': [{'id': '7'}, {'id': '8'}]})
+        self.assertEqual(b['previous'], a['catchup_id'])
+        doc = call(self.srv, 'catchup_list', {'catchup_id': b['catchup_id']})['structuredContent']
+        self.assertEqual(doc['previous_catchup']['catchup_id'], a['catchup_id'])
+        self.assertEqual(doc['new_since_previous']['chats'], ['c2'])
+        self.assertEqual(doc['new_since_previous']['notifications'], ['8'])
+        self.assertEqual(doc['new_since_previous']['shown_keys_last_time'], ['chat:c1', 'mail:m1', 'money:x'])
+        self.assertEqual(doc['previous_catchup']['record']['decided'], [{'key': 'chat:c1', 'decision': 'archive'}])
+
+    def test_empty_ready_is_fine_and_bad_input_refused(self):
+        self.assertEqual(self.srv.save_catchup({})['chats'], 0)
+        with self.assertRaises(self.srv.Problem):
+            self.srv.save_catchup({'chats': [{'title': 'no id'}]})
+        bad = call(self.srv, 'catchup_list', {'catchup_id': '../etc/passwd'})
+        self.assertTrue(bad['isError'])
+        bad = call(self.srv, 'catchup_record', {'catchup_id': 'cu_20260101_000000_abcdef'})
+        self.assertTrue(bad['isError'])
+
+    def test_http_route_follows_switch(self):
+        httpd = ThreadingHTTPServer(('127.0.0.1', 0), self.srv.Handler)
+        port = httpd.server_address[1]
+        self.srv.TRUSTED_HOSTS.add(f'127.0.0.1:{port}')
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            def post():
+                req = urllib.request.Request(f'http://127.0.0.1:{port}/api/catchup', data=json.dumps({'chats': []}).encode(),
+                                             headers={'Content-Type': 'application/json'}, method='POST')
+                try:
+                    with urllib.request.urlopen(req) as r:
+                        return r.status, json.loads(r.read())
+                except urllib.error.HTTPError as e:
+                    return e.code, json.loads(e.read())
+            self.assertEqual(post()[0], 404)
+            (Path(self.tmp.name) / 'switches.json').write_text(json.dumps({'catch-me-up': True}))
+            code, body = post()
+            self.assertEqual(code, 201)
+            self.assertTrue(body['catchup_id'].startswith('cu_'))
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/features') as r:
+                self.assertTrue(json.loads(r.read())['catch-me-up'])
+        finally:
+            httpd.shutdown()
+
+
+if __name__ == '__main__':
+    unittest.main()
