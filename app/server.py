@@ -99,19 +99,9 @@ TOOLS = [
     {'name': 'wizard_echo', 'description': 'Echo text to prove this app is reachable.', 'inputSchema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}},
     {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the tg-style skill's Ready sweep section says.",
      'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
-    {'name': 'catchup_list', 'description': "What the owner had waiting when he tapped Catch me up: his Ready chats and unread notifications, "
-                                            "the previous catch-up's record (what was shown and decided) and what is new since it. Without catchup_id: "
-                                            "his newest. Follow the tg-style skill's Catch me up section.",
+    {'name': 'catchup_list', 'description': "What the owner had waiting when he tapped Catch me up: his Ready chats and unread notifications. "
+                                            "Without catchup_id: his newest. Each catch-up is a fresh pull; follow the tg-style skill's Catch me up section.",
      'inputSchema': {'type': 'object', 'properties': {'catchup_id': {'type': 'string', 'description': 'From the catch-up chat\'s first message; omit for the newest.'}}}},
-    {'name': 'catchup_record', 'description': 'Save what this catch-up showed the owner and what he decided, so the next catch-up can lead '
-                                              'with what is new. Keys name each item by source, e.g. "chat:<id>", "messenger:<draft id>", '
-                                              '"tracker:<repo>#<n>", "notification:<id>", "mail:<id>", "money:<id>".',
-     'inputSchema': {'type': 'object', 'required': ['catchup_id'], 'properties': {
-         'catchup_id': {'type': 'string'},
-         'shown': {'type': 'array', 'items': {'type': 'object', 'properties': {'key': {'type': 'string'}, 'source': {'type': 'string'}, 'title': {'type': 'string'}}, 'required': ['key']}},
-         'decided': {'type': 'array', 'items': {'type': 'object', 'properties': {'key': {'type': 'string'}, 'decision': {'type': 'string'}}, 'required': ['key']}},
-         'note': {'type': 'string', 'description': 'One line on anything left open.'},
-         'append': {'type': 'boolean', 'description': 'Add to what this catch-up already recorded instead of replacing it.'}}}},
 ]
 
 
@@ -163,8 +153,8 @@ def get_sweep(sweep_id=None):
     return json.loads(f.read_text())
 
 
-# ---- Catch me up (switch catch-me-up): the Ready chats and unread notifications the owner had when he tapped it, linked
-# to his previous catch-up, plus what the agent showed and he decided, so the next one can lead with what is new ----
+# ---- Catch me up (switch catch-me-up): the Ready chats and unread notifications the owner had when he tapped it.
+# A fresh pull every time: nothing links one catch-up to the one before (Miguel, 20 Nov 2026) ----
 CATCHUP_ID = re.compile(r'^cu_[0-9]{8}_[0-9]{6}_[0-9a-f]{6}$')
 CATCHUP_KEEP = 30
 
@@ -214,19 +204,17 @@ def save_catchup(body):
             raise Problem(400, 'Each notification needs an id.')
         alerts.append({'id': str(it['id']), 'title': _clip(it.get('title'), 160), 'message': _clip(it.get('message'), 400),
                        'from': _clip(it.get('from'), 60), 'time': _clip(it.get('time'), 40), 'priority': _clip(it.get('priority'), 4)})
-    files = _catchup_files()
-    prev = files[-1].stem if files else None
     cid = time.strftime('cu_%Y%m%d_%H%M%S_', time.gmtime()) + os.urandom(3).hex()
-    doc = {'catchup_id': cid, 'created': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'previous': prev,
-           'chats': rows, 'notifications': alerts, 'record': None}
+    doc = {'catchup_id': cid, 'created': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+           'chats': rows, 'notifications': alerts}
     _catchup_write(doc)
     for old in _catchup_files()[:-CATCHUP_KEEP]:
         old.unlink(missing_ok=True)
-    return {'catchup_id': cid, 'chats': len(rows), 'notifications': len(alerts), 'previous': prev}
+    return {'catchup_id': cid, 'chats': len(rows), 'notifications': len(alerts)}
 
 
 def get_catchup(cid=None):
-    """One catch-up (newest without an id), with its previous one's record and what is new since then."""
+    """One catch-up (newest without an id): the Ready chats and unread notifications saved when he tapped it."""
     if cid:
         doc = _catchup_read(cid)
     else:
@@ -234,56 +222,7 @@ def get_catchup(cid=None):
         if not files:
             raise Problem(404, 'No catch-up yet: the owner starts one with Catch me up in the Ready folder.')
         doc = json.loads(files[-1].read_text())
-    prev = None
-    if doc.get('previous'):
-        try:
-            prev = _catchup_read(doc['previous'])
-        except Problem:
-            prev = None   # pruned
-    out = dict(doc)
-    if prev:
-        seen_chats = {c['id'] for c in prev.get('chats', [])}
-        seen_notes = {n['id'] for n in prev.get('notifications', [])}
-        seen_keys = {str(x.get('key')) for x in ((prev.get('record') or {}).get('shown') or []) if isinstance(x, dict)}
-        out['previous_catchup'] = {'catchup_id': prev['catchup_id'], 'created': prev.get('created'), 'record': prev.get('record')}
-        out['new_since_previous'] = {'chats': [c['id'] for c in doc.get('chats', []) if c['id'] not in seen_chats],
-                                     'notifications': [n['id'] for n in doc.get('notifications', []) if n['id'] not in seen_notes],
-                                     'shown_keys_last_time': sorted(seen_keys)}
-    else:
-        out['previous_catchup'] = None
-        out['new_since_previous'] = None   # first catch-up: everything is new
-    return out
-
-
-def _entries(value, fields, limit):
-    if value is None:
-        return []
-    if not isinstance(value, list) or len(value) > limit:
-        raise Problem(400, f'Send a list of up to {limit} items.')
-    out = []
-    for it in value:
-        if isinstance(it, str):
-            it = {'key': it}
-        if not isinstance(it, dict) or not _clip(it.get('key'), 200):
-            raise Problem(400, 'Each item needs a key (e.g. "chat:<id>", "mail:<id>", "tracker:<repo>#<n>").')
-        out.append({f: _clip(it.get(f), 200 if f == 'key' else 300) for f in fields if it.get(f) not in (None, '')})
-    return out
-
-
-def record_catchup(args):
-    doc = _catchup_read(args.get('catchup_id'))
-    rec = {'recorded': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-           'shown': _entries(args.get('shown'), ('key', 'source', 'title'), 600),
-           'decided': _entries(args.get('decided'), ('key', 'decision'), 600),
-           'note': _clip(args.get('note'), 1000)}
-    old = doc.get('record') or {}
-    if old and args.get('append'):   # several chunks: add to what is already recorded
-        keep = lambda a, b: list({x['key']: x for x in a + b}.values())
-        rec['shown'], rec['decided'] = keep(old.get('shown') or [], rec['shown']), keep(old.get('decided') or [], rec['decided'])
-        rec['note'] = _clip(' '.join(filter(None, [old.get('note'), rec['note']])), 1000)
-    doc['record'] = rec
-    _catchup_write(doc)
-    return {'catchup_id': doc['catchup_id'], 'shown': len(rec['shown']), 'decided': len(rec['decided'])}
+    return {k: doc.get(k) for k in ('catchup_id', 'created', 'chats', 'notifications')}
 
 
 def rpc(msg):
@@ -315,8 +254,6 @@ def rpc(msg):
                 value = get_sweep(a.get('sweep_id'))
             elif n == 'catchup_list':
                 value = get_catchup(a.get('catchup_id'))
-            elif n == 'catchup_record':
-                value = record_catchup(a)
             else:
                 return {'jsonrpc': '2.0', 'id': i, 'error': {'code': -32602, 'message': 'Unknown tool.'}}
             r = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': False}
@@ -565,9 +502,9 @@ SWITCHES = [
                     'in sensible chunks, so you can archive, answer or keep them in bulk.',
      'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'catch-me-up', 'name': 'Catch me up',
-     'description': 'In the Ready folder, Sweep becomes Catch me up: one tap opens a chat where your agent gives a one-screen overview '
-                    'of everything waiting on you across your apps (Ready chats, Messenger, Tracker, notifications, Money, Mail and more), '
-                    'new since your last catch-up first, then works through it in A/B/C chunks with one-word replies.',
+     'description': 'In the Ready folder, Sweep becomes Catch me up: one tap starts a catch-up chat in the background (the button spins '
+                    'while it runs). When it is done it lands in Ready with a one-screen overview of everything waiting on you across your '
+                    'apps (Ready chats, Messenger, Tracker, notifications, Money, Mail and more), then A/B/C chunks you answer with one word.',
      'default': False, 'issues': ['humanitylabs-org/telegram#7']},
     {'id': 'numbered-models', 'name': 'Numbered model defaults',
      'description': "The chat's model menu shows five rows, Opus, GLM, DeepSeek, Fable and Sol, each the newest version "

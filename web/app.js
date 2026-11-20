@@ -4,6 +4,7 @@
 import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
 import { defaultRows as numberedRows, numberedLabel } from './tg-models.js';
+import { catchupRunning, catchupMessage } from './tg-catchup.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -269,9 +270,10 @@ function start() {
     // Ready sweep (switch ready-sweep): save the Ready list the owner sees, then open a new chat that works through it.
     sweep: rows => startSweep(rows),
     sweepBusy: () => sweeping,
-    // Catch me up (switch catch-me-up): save Ready chats + unread notifications, then open a chat that covers every app.
+    // Catch me up (switch catch-me-up): save Ready chats + unread notifications, then start a chat that covers every app
+    // in the background. The pill spins while that chat runs; it lands in Ready when the overview is done.
     catchup: rows => startCatchup(rows),
-    catchupBusy: () => catching,
+    catchupBusy: () => catching || catchupRunning(lastCatchup(), lastCatchupSession()),
     // Switch ready-total: the Ready total rides on this app's badge in Wizard's app list.
     onCounts: c => { if (!host.features?.['ready-total']) return; const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
@@ -295,10 +297,12 @@ function start() {
     finally { sweeping = false; instance?.update?.(); }
   }
   let catching = false;
-  // Same one-tap rule as Sweep: taps while it starts are ignored, a tap within 2 minutes reopens the last catch-up.
+  const lastCatchup = () => { try { return JSON.parse(localStorage.getItem('tg.lastCatchup') || 'null'); } catch (_) { return null; } };
+  const lastCatchupSession = () => { const l = lastCatchup(); try { return l?.id ? LIVE.session(l.id) || null : null; } catch (_) { return null; } };
+  // Fresh pull every time, started in the background: the owner stays where he is. While a catch-up is still running
+  // a tap does nothing (the pill is disabled and spinning), so there is never a second run.
   async function startCatchup(rows) {
-    if (catching) return;
-    try { const last = JSON.parse(localStorage.getItem('tg.lastCatchup') || 'null'); if (last && Date.now() - last.at < 120000 && LIVE.session(last.id) && !LIVE.session(last.id).archived) { open(last.id); return; } } catch (_) {}
+    if (catching || catchupRunning(lastCatchup(), lastCatchupSession())) return;
     catching = true; instance?.update?.();
     try {
       const chats = (rows || []).map(s => ({ id: s.id, title: s.title, status: s.status, state: s.attention?.state, ask: s.attention?.ask,
@@ -308,10 +312,9 @@ function start() {
       const r = await fetch('api/catchup', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chats, notifications }) });
       const cu = await r.json().catch(() => ({}));
       if (!r.ok || !cu.catchup_id) throw new Error(cu.error || 'Could not start the catch-up');
-      const text = `\u2728 Catch me up (${cu.catchup_id})`;
-      const out = await LIVE.send(text, { instructions: `Catch me up from the TG style app. Load the tg-style skill and follow its Catch me up section. Start with the tg-style app's catchup_list tool (mcp__wizard__tg_style__catchup_list), catchup_id ${cu.catchup_id}; it has ${cu.chats} Ready chat(s), ${cu.notifications} unread notification(s) and the previous catch-up's record. Then check the owner's other apps as the skill says, and save what you showed and he decided with catchup_record.` });
+      const m = catchupMessage(cu);
+      const out = await LIVE.send(m.text, { instructions: m.instructions });
       try { localStorage.setItem('tg.lastCatchup', JSON.stringify({ id: out.sessionId, at: Date.now() })); } catch (_) {}
-      open(out.sessionId);
     } catch (e) { showErr(e.message || 'Could not start the catch-up'); }
     finally { catching = false; instance?.update?.(); }
   }
