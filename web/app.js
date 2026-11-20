@@ -3,6 +3,7 @@
 // messages, tokens or model logic of its own.
 import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
+import { defaultRows as numberedRows, numberedLabel } from './tg-models.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -344,6 +345,7 @@ function start() {
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
     if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
+    if (f?.['numbered-models']) syncModelChip();
     if (f?.['newest-preview'] !== true) return;
     host.rowInfo = rowAsks;
     host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
@@ -732,10 +734,18 @@ function start() {
     const M = MODELS(); if (!M) return null;
     try { return thread === '__new__' || isNote() ? newPick || M.currentRoute('', null) : M.currentRoute(thread, null); } catch (_) { return null; }
   }
+  // Numbered model defaults (switch numbered-models, telegram#13): five numbered rows and a numbered header pill.
+  const numbered = () => host.features?.['numbered-models'] === true;
+  // Same rule as the shell's own menu: a disconnected AI connector's models leave the list (a thread keeps its current one).
+  function reachable(M, cur, keep) {
+    const con = o => /^(claude-subscription-directsdk-experimental|anthropic)$/.test(o.provider) ? 'claude' : o.provider === 'openai-codex' ? 'chatgpt' : /wizard-tinfoil$/.test(o.provider || '') ? 'tinfoil' : '';
+    return M.options.filter(o => { const c = con(o); let ok = true; try { ok = !c || typeof M.connected !== 'function' || M.connected(c); } catch (_) {} return ok || (keep && cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider)); });
+  }
   function modelLabel() {
     const M = MODELS(); if (!M) return '';
     if (modelBusy) return 'Saving…';
-    const r = curRoute(); return r?.model ? M.short(r.model, r.provider) || r.model : 'Model';
+    const r = curRoute(); if (!r?.model) return 'Model';
+    return (numbered() && numberedLabel(r.model)) || M.short(r.model, r.provider) || r.model;
   }
   function modelChipHtml() { return MODELS() ? `<button type="button" class="tg-model" data-tg-model aria-haspopup="menu" title="Choose the model" aria-label="Model: ${esc(modelLabel())}"><span>${esc(modelLabel())}</span><i class="tg-chev" aria-hidden="true"></i></button>` : ''; }
   function syncModelChip() {
@@ -748,7 +758,8 @@ function start() {
     if (!M.ready) { try { await M.load(); } catch (_) {} syncModelChip(); }
     if (!M.ready && !M.options.length) return showErr(M.error || 'Could not load models');
     const cur = curRoute(), keep = thread !== '__new__' && !isNote();
-    const vis = M.visible(cur?.model || '', cur?.provider || '', keep);
+    let vis = M.visible(cur?.model || '', cur?.provider || '', keep);
+    if (numbered()) { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
     modelList = all ? M.options : vis;
     const on = o => cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider);
     menu = document.createElement('div'); menu.className = 'tg-menu tg-models'; menu.setAttribute('role', 'menu');
