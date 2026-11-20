@@ -21,6 +21,7 @@ export function catchupMessage(cu) {
     instructions: `Catch me up from the TG style app. Load the tg-style skill and follow its Catch me up section. `
       + `Start with the tg-style app's catchup_list tool (mcp__wizard__tg_style__catchup_list), catchup_id ${cu.catchup_id}; `
       + `it has ${n} Ready chat(s) and ${a} unread notification(s). Then check the owner's other installed apps as the skill says. `
-      + `This is a fresh pull: say nothing about earlier catch-ups.`,
+      + `This is a fresh pull: say nothing about earlier catch-ups. `
+      + `Write it in the skill's fixed phone layout (## heading, app table, ### A/B/C/D sections, one bold card per item), even if your persona avoids headings.`,
   };
 }

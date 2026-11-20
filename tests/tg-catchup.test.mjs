@@ -27,4 +27,5 @@ test('message is a fresh pull, no earlier-catch-up logic', () => {
   assert.match(m.instructions, /catchup_list/);
   assert.match(m.instructions, /3 Ready chat\(s\) and 2 unread/);
   assert.doesNotMatch(m.instructions, /catchup_record|previous/);
+  assert.match(m.instructions, /fixed phone layout/);
 });
