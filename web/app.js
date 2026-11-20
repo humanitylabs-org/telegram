@@ -268,6 +268,9 @@ function start() {
     // Ready sweep (switch ready-sweep): save the Ready list the owner sees, then open a new chat that works through it.
     sweep: rows => startSweep(rows),
     sweepBusy: () => sweeping,
+    // Catch me up (switch catch-me-up): save Ready chats + unread notifications, then open a chat that covers every app.
+    catchup: rows => startCatchup(rows),
+    catchupBusy: () => catching,
     // Switch ready-total: the Ready total rides on this app's badge in Wizard's app list.
     onCounts: c => { if (!host.features?.['ready-total']) return; const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
@@ -289,6 +292,27 @@ function start() {
       open(out.sessionId);
     } catch (e) { showErr(e.message || 'Could not start the sweep'); }
     finally { sweeping = false; instance?.update?.(); }
+  }
+  let catching = false;
+  // Same one-tap rule as Sweep: taps while it starts are ignored, a tap within 2 minutes reopens the last catch-up.
+  async function startCatchup(rows) {
+    if (catching) return;
+    try { const last = JSON.parse(localStorage.getItem('tg.lastCatchup') || 'null'); if (last && Date.now() - last.at < 120000 && LIVE.session(last.id) && !LIVE.session(last.id).archived) { open(last.id); return; } } catch (_) {}
+    catching = true; instance?.update?.();
+    try {
+      const chats = (rows || []).map(s => ({ id: s.id, title: s.title, status: s.status, state: s.attention?.state, ask: s.attention?.ask,
+        preview: s.preview, time: s.lastAssistantAt || s.updatedAt || '', unread: !!LIVE.isNew?.(s) }));
+      const notifications = NOTES.items().filter(i => !i.read).slice(0, 200).map(i => ({ id: String(i.id), title: i.title || '', message: String(i.message || '').slice(0, 400),
+        from: i.appName || i.fromName || i.app || i.from || '', time: i.time ? new Date(i.time * 1000).toISOString() : '', priority: String(i.priority || '') }));
+      const r = await fetch('api/catchup', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chats, notifications }) });
+      const cu = await r.json().catch(() => ({}));
+      if (!r.ok || !cu.catchup_id) throw new Error(cu.error || 'Could not start the catch-up');
+      const text = `\u2728 Catch me up (${cu.catchup_id})`;
+      const out = await LIVE.send(text, { instructions: `Catch me up from the TG style app. Load the tg-style skill and follow its Catch me up section. Start with the tg-style app's catchup_list tool (mcp__wizard__tg_style__catchup_list), catchup_id ${cu.catchup_id}; it has ${cu.chats} Ready chat(s), ${cu.notifications} unread notification(s) and the previous catch-up's record. Then check the owner's other apps as the skill says, and save what you showed and he decided with catchup_record.` });
+      try { localStorage.setItem('tg.lastCatchup', JSON.stringify({ id: out.sessionId, at: Date.now() })); } catch (_) {}
+      open(out.sessionId);
+    } catch (e) { showErr(e.message || 'Could not start the catch-up'); }
+    finally { catching = false; instance?.update?.(); }
   }
   // Switch newest-preview (telegram#1, off by default): rows show the newest reply's summary plus an open-ask chip.
   // Each row's thread (and its tracker items, when the box keeps them) is read in the background, two at a time,
@@ -319,7 +343,7 @@ function start() {
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
-    if (f?.['ready-total'] || f?.['ready-sweep']) instance?.update?.();
+    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
     if (f?.['newest-preview'] !== true) return;
     host.rowInfo = rowAsks;
     host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };

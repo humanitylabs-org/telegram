@@ -99,6 +99,19 @@ TOOLS = [
     {'name': 'wizard_echo', 'description': 'Echo text to prove this app is reachable.', 'inputSchema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}},
     {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the tg-style skill's Ready sweep section says.",
      'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
+    {'name': 'catchup_list', 'description': "What the owner had waiting when he tapped Catch me up: his Ready chats and unread notifications, "
+                                            "the previous catch-up's record (what was shown and decided) and what is new since it. Without catchup_id: "
+                                            "his newest. Follow the tg-style skill's Catch me up section.",
+     'inputSchema': {'type': 'object', 'properties': {'catchup_id': {'type': 'string', 'description': 'From the catch-up chat\'s first message; omit for the newest.'}}}},
+    {'name': 'catchup_record', 'description': 'Save what this catch-up showed the owner and what he decided, so the next catch-up can lead '
+                                              'with what is new. Keys name each item by source, e.g. "chat:<id>", "messenger:<draft id>", '
+                                              '"tracker:<repo>#<n>", "notification:<id>", "mail:<id>", "money:<id>".',
+     'inputSchema': {'type': 'object', 'required': ['catchup_id'], 'properties': {
+         'catchup_id': {'type': 'string'},
+         'shown': {'type': 'array', 'items': {'type': 'object', 'properties': {'key': {'type': 'string'}, 'source': {'type': 'string'}, 'title': {'type': 'string'}}, 'required': ['key']}},
+         'decided': {'type': 'array', 'items': {'type': 'object', 'properties': {'key': {'type': 'string'}, 'decision': {'type': 'string'}}, 'required': ['key']}},
+         'note': {'type': 'string', 'description': 'One line on anything left open.'},
+         'append': {'type': 'boolean', 'description': 'Add to what this catch-up already recorded instead of replacing it.'}}}},
 ]
 
 
@@ -150,6 +163,129 @@ def get_sweep(sweep_id=None):
     return json.loads(f.read_text())
 
 
+# ---- Catch me up (switch catch-me-up): the Ready chats and unread notifications the owner had when he tapped it, linked
+# to his previous catch-up, plus what the agent showed and he decided, so the next one can lead with what is new ----
+CATCHUP_ID = re.compile(r'^cu_[0-9]{8}_[0-9]{6}_[0-9a-f]{6}$')
+CATCHUP_KEEP = 30
+
+
+def _catchup_dir():
+    d = DATA / 'catchups'
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _catchup_files():
+    return sorted(_catchup_dir().glob('cu_*.json'))
+
+
+def _catchup_read(cid):
+    if not CATCHUP_ID.match(str(cid or '')):
+        raise Problem(400, 'Unknown catch-up id.')
+    f = _catchup_dir() / (cid + '.json')
+    if not f.is_file():
+        raise Problem(404, 'Unknown catch-up id.')
+    return json.loads(f.read_text())
+
+
+def _catchup_write(doc):
+    f = _catchup_dir() / (doc['catchup_id'] + '.json')
+    tmp = f.with_suffix('.tmp')
+    tmp.write_text(json.dumps(doc))
+    tmp.replace(f)
+
+
+def save_catchup(body):
+    chats, notes = body.get('chats', []), body.get('notifications', [])
+    if not isinstance(chats, list) or len(chats) > 400:
+        raise Problem(400, 'chats must list up to 400 chats.')
+    if not isinstance(notes, list) or len(notes) > 200:
+        raise Problem(400, 'notifications must list up to 200 items.')
+    rows, alerts = [], []
+    for it in chats:
+        if not isinstance(it, dict) or not isinstance(it.get('id'), str) or not 0 < len(it['id']) <= 120:
+            raise Problem(400, 'Each chat needs an id.')
+        rows.append({'id': it['id'], 'title': _clip(it.get('title'), 120), 'status': _clip(it.get('status'), 40),
+                     'state': _clip(it.get('state'), 20), 'ask': _clip(it.get('ask'), 300), 'preview': _clip(it.get('preview'), 300),
+                     'time': _clip(it.get('time'), 40), 'unread': bool(it.get('unread'))})
+    for it in notes:
+        if not isinstance(it, dict) or not isinstance(it.get('id'), (str, int)) or isinstance(it.get('id'), bool) \
+                or not 0 < len(str(it['id'])) <= 120:
+            raise Problem(400, 'Each notification needs an id.')
+        alerts.append({'id': str(it['id']), 'title': _clip(it.get('title'), 160), 'message': _clip(it.get('message'), 400),
+                       'from': _clip(it.get('from'), 60), 'time': _clip(it.get('time'), 40), 'priority': _clip(it.get('priority'), 4)})
+    files = _catchup_files()
+    prev = files[-1].stem if files else None
+    cid = time.strftime('cu_%Y%m%d_%H%M%S_', time.gmtime()) + os.urandom(3).hex()
+    doc = {'catchup_id': cid, 'created': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'previous': prev,
+           'chats': rows, 'notifications': alerts, 'record': None}
+    _catchup_write(doc)
+    for old in _catchup_files()[:-CATCHUP_KEEP]:
+        old.unlink(missing_ok=True)
+    return {'catchup_id': cid, 'chats': len(rows), 'notifications': len(alerts), 'previous': prev}
+
+
+def get_catchup(cid=None):
+    """One catch-up (newest without an id), with its previous one's record and what is new since then."""
+    if cid:
+        doc = _catchup_read(cid)
+    else:
+        files = _catchup_files()
+        if not files:
+            raise Problem(404, 'No catch-up yet: the owner starts one with Catch me up in the Ready folder.')
+        doc = json.loads(files[-1].read_text())
+    prev = None
+    if doc.get('previous'):
+        try:
+            prev = _catchup_read(doc['previous'])
+        except Problem:
+            prev = None   # pruned
+    out = dict(doc)
+    if prev:
+        seen_chats = {c['id'] for c in prev.get('chats', [])}
+        seen_notes = {n['id'] for n in prev.get('notifications', [])}
+        seen_keys = {str(x.get('key')) for x in ((prev.get('record') or {}).get('shown') or []) if isinstance(x, dict)}
+        out['previous_catchup'] = {'catchup_id': prev['catchup_id'], 'created': prev.get('created'), 'record': prev.get('record')}
+        out['new_since_previous'] = {'chats': [c['id'] for c in doc.get('chats', []) if c['id'] not in seen_chats],
+                                     'notifications': [n['id'] for n in doc.get('notifications', []) if n['id'] not in seen_notes],
+                                     'shown_keys_last_time': sorted(seen_keys)}
+    else:
+        out['previous_catchup'] = None
+        out['new_since_previous'] = None   # first catch-up: everything is new
+    return out
+
+
+def _entries(value, fields, limit):
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > limit:
+        raise Problem(400, f'Send a list of up to {limit} items.')
+    out = []
+    for it in value:
+        if isinstance(it, str):
+            it = {'key': it}
+        if not isinstance(it, dict) or not _clip(it.get('key'), 200):
+            raise Problem(400, 'Each item needs a key (e.g. "chat:<id>", "mail:<id>", "tracker:<repo>#<n>").')
+        out.append({f: _clip(it.get(f), 200 if f == 'key' else 300) for f in fields if it.get(f) not in (None, '')})
+    return out
+
+
+def record_catchup(args):
+    doc = _catchup_read(args.get('catchup_id'))
+    rec = {'recorded': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+           'shown': _entries(args.get('shown'), ('key', 'source', 'title'), 600),
+           'decided': _entries(args.get('decided'), ('key', 'decision'), 600),
+           'note': _clip(args.get('note'), 1000)}
+    old = doc.get('record') or {}
+    if old and args.get('append'):   # several chunks: add to what is already recorded
+        keep = lambda a, b: list({x['key']: x for x in a + b}.values())
+        rec['shown'], rec['decided'] = keep(old.get('shown') or [], rec['shown']), keep(old.get('decided') or [], rec['decided'])
+        rec['note'] = _clip(' '.join(filter(None, [old.get('note'), rec['note']])), 1000)
+    doc['record'] = rec
+    _catchup_write(doc)
+    return {'catchup_id': doc['catchup_id'], 'shown': len(rec['shown']), 'decided': len(rec['decided'])}
+
+
 def rpc(msg):
     if not isinstance(msg, dict):
         return {'jsonrpc': '2.0', 'id': None, 'error': {'code': -32600, 'message': 'Expected a JSON-RPC object.'}}
@@ -177,6 +313,10 @@ def rpc(msg):
                 value = {'text': str(a.get('text', ''))}
             elif n == 'sweep_list':
                 value = get_sweep(a.get('sweep_id'))
+            elif n == 'catchup_list':
+                value = get_catchup(a.get('catchup_id'))
+            elif n == 'catchup_record':
+                value = record_catchup(a)
             else:
                 return {'jsonrpc': '2.0', 'id': i, 'error': {'code': -32602, 'message': 'Unknown tool.'}}
             r = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': False}
@@ -356,7 +496,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(415, {'error': 'Use application/json.'})
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if not 0 <= size <= (524288 if path == '/api/sweep' else 65536):  # a sweep carries the whole Ready list
+            if not 0 <= size <= (524288 if path in ('/api/sweep', '/api/catchup') else 65536):  # these carry the whole Ready list
                 return self.send(413, {'error': 'Request too large.'})
             body = json.loads(self.rfile.read(size))
             if path == '/mcp':
@@ -377,6 +517,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'text': str(body.get('text', ''))})
             if path == '/api/sweep':
                 return self.send(201, save_sweep(body))
+            if path == '/api/catchup':
+                if not switch_on('catch-me-up'):
+                    return self.send(404, {'error': 'Catch me up is switched off.'})
+                return self.send(201, save_catchup(body))
             self.send(404, {'error': 'Not found.'})
         except Problem as e:
             self.send(e.code, {'error': e.message})
@@ -420,6 +564,11 @@ SWITCHES = [
      'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
                     'in sensible chunks, so you can archive, answer or keep them in bulk.',
      'default': False, 'issues': ['humanitylabs-org/telegram#5']},
+    {'id': 'catch-me-up', 'name': 'Catch me up',
+     'description': 'In the Ready folder, Sweep becomes Catch me up: one tap opens a chat where your agent gives a one-screen overview '
+                    'of everything waiting on you across your apps (Ready chats, Messenger, Tracker, notifications, Money, Mail and more), '
+                    'new since your last catch-up first, then works through it in A/B/C chunks with one-word replies.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#7']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
