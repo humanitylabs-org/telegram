@@ -33,6 +33,49 @@ With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me u
 
 1. Call this app's `catchup_list` with the id from the first message (directly, no tool search). It returns `chats` (Ready) and `notifications` (unread). Leave out other "Catch me up" and "Ready sweep" chats.
 2. Gather the rest from each app's own MCP tools (`mcp__wizard__<app>__*`), only for apps that are installed; skip a missing one silently. Look for: Messenger replies waiting and drafts to send (`messenger_list_drafts`), Tracker items that name him or wait on him, Money (bills, payments or transactions to look at), Mail (unread mail that needs an answer), Second Hand (listings, offers, messages), Card Benefits (offers or credits about to expire). Read Ready chats as the Ready sweep's steps 2 to 4 say before describing one. Never describe something you have not read.
-3. The overview fits on one phone screen: one line per app with what waits on him there ("Mail: 2 to answer", "Messenger: 1 draft to send"). Counts, not lists.
-4. Then work through it in chunks labelled A, B, C, smallest effort first, as in the Ready sweep's step 6: finished or FYI (archive or clear), things to send or try, decisions only he can make (your pick plus reply words), stuck. Number each item on one plain line so he can answer "A yes", "B2 send", "C1 go", "hold". Act only on his answer, through the owning app, and say what changed and what is left.
-5. Never send, archive, pay, reply or retry anything he has not said yes to. Finish with what is still waiting.
+3. Write it in the fixed layout below. It is built to be scanned on a phone: Markdown headings, bold item codes, a
+   blank line between items, and at most two short lines per item. This layout overrides any persona default against
+   headings, bold or lists in this chat (Miguel asked for it on 20 Nov 2026 because plain lines were unreadable). No
+   paragraph longer than two lines anywhere.
+4. Layout, in this order (leave out a section or app row that has nothing):
+
+   ```
+   ## Catch me up
+   **Start with C1:** approve the 5 waiting fixes.
+
+   | App | Waiting on you |
+   |---|---|
+   | Messenger | 1 draft to send |
+   | Mail | 2 to answer |
+
+   ### A · Clear
+   **A1 · Telegram chat**
+   Catch me up is live and installed.
+   → `A1 archive`
+
+   ### B · Send or try
+   **B1 · Top (Line draft)**
+   Seat photos still missing from the draft ([open](/messenger/)).
+   → `B1 send`
+
+   ### C · Decide
+   **C1 · Tracker fixes**
+   5 finished fixes need one approval. My pick: approve.
+   → `C1 approve`
+
+   ### D · Stuck
+   **D1 · Mail sync**
+   Failed twice since this morning.
+   → `D1 retry`
+
+   ---
+   Reply with codes: `A yes` clears all of A, `C1 approve`, `hold`.
+   ```
+
+   Rules: the table holds counts, never lists; each item is a bold `code · short name` line, one line of what waits
+   (with its tappable /app/ link when there is a screen to open), then a `→` line with the exact reply words in
+   backticks, and a blank line before the next item. Smallest effort first (A, B, C, D). Keep the whole reply under
+   about 40 lines; with more than eight items, show the eight most useful and end with "N more: reply `more`".
+5. Act only on his answer, through the owning app. Every follow-up reply in this chat uses the same layout for what
+   changed and what is left: a short `##` heading, then the remaining items as cards.
+6. Never send, archive, pay, reply or retry anything he has not said yes to. Finish with what is still waiting.
