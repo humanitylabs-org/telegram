@@ -274,7 +274,8 @@ function start() {
     // in the background. The pill spins while that chat runs; it lands in Ready when the overview is done.
     catchup: rows => startCatchup(rows),
     catchupBusy: () => catching || catchupRunning(lastCatchup(), lastCatchupSession()),
-    // Switch ready-total: the Ready total rides on this app's badge in Wizard's app list.
+    // Switch ready-total: the Ready total also rides on this app's badge in Wizard's app list. The badge is a while-open
+    // extra (the shell clears it when the window closes or reloads), so the Ready tab is the source of truth.
     onCounts: c => { if (!host.features?.['ready-total']) return; const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
   let sweeping = false, lastBadge = -1;

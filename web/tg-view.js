@@ -339,8 +339,9 @@ export default {
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
           t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
-          // Switch ready-total: Ready's number lives on the app's own badge in Wizard's app list, not on the tab (Miguel, 19 Nov 2026).
-          const n = id === 'ready' ? (host.features?.['ready-total'] ? 0 : c.ready) : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
+          // Switch ready-total: the Ready tab shows its total, every chat in it read or not (Miguel, 20 Nov 2026); the same
+          // number also rides on the app's badge while the app is open.
+          const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
           tabs.append(t);
         }
