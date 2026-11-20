@@ -48,6 +48,24 @@ class CatchupTest(unittest.TestCase):
         self.assertIn('catchup_list', names)
         self.assertNotIn('catchup_record', names)   # fresh pull every time: nothing records for the next one
 
+    def test_notifications_are_only_the_chats_routed_ones(self):
+        # wizard-os#758 follow-up: never the raw Notifications inbox or its unread count.
+        tool = next(t for t in self.srv.TOOLS if t['name'] == 'catchup_list')
+        self.assertIn('routing sends to Chats', tool['description'])
+        self.assertIn("never read the Notifications app's inbox", tool['description'])
+        self.srv.save_catchup({'notifications': [{'id': 1}]})
+        doc = call(self.srv, 'catchup_list', {})['structuredContent']
+        self.assertIn('routing sends to Chats', doc['notifications_scope'])
+        self.assertIn('never read the Notifications app inbox', doc['notifications_scope'])
+
+    def test_skill_has_the_followups(self):
+        skill = (Path(__file__).resolve().parent.parent / 'skill' / 'SKILL.md').read_text()
+        self.assertIn('never report its unread count', skill)
+        self.assertIn('`to watch` line', skill)
+        self.assertIn('keep them unread', skill)
+        self.assertIn('two short sentences of real context', skill)
+        self.assertNotIn('one sentence of real context', skill)
+
     def test_each_catchup_is_a_fresh_pull(self):
         a = self.srv.save_catchup({'chats': [{'id': 'c1', 'title': 'One'}], 'notifications': [{'id': 7, 'title': 'Bill'}]})
         self.assertNotIn('previous', a)
@@ -59,7 +77,7 @@ class CatchupTest(unittest.TestCase):
         self.assertEqual(set(b), {'catchup_id', 'chats', 'notifications'})
         doc = call(self.srv, 'catchup_list', {})['structuredContent']
         self.assertEqual(doc['catchup_id'], b['catchup_id'])
-        self.assertEqual(set(doc), {'catchup_id', 'created', 'chats', 'notifications'})
+        self.assertEqual(set(doc), {'catchup_id', 'created', 'chats', 'notifications', 'notifications_scope'})
         self.assertEqual([c['id'] for c in doc['chats']], ['c1', 'c2'])
         self.assertEqual([n['id'] for n in doc['notifications']], ['8'])
         old = call(self.srv, 'catchup_list', {'catchup_id': a['catchup_id']})['structuredContent']

@@ -32,6 +32,7 @@ The Sweep button in the Ready folder (switch `ready-sweep`) saves the Ready list
 With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me up. A tap saves his Ready chats and unread notifications and starts a new chat in the background starting "Catch me up (cu_…)"; he stays in the list, sees it as Working, and it lands in Ready when your overview is done. He acts there and archives it himself; in this chat TG style shows every reply in full (no short answer). Every catch-up is a fresh pull: never mention earlier catch-ups, what is new since one, or what was seen or held last time.
 
 1. Call this app's `catchup_list` with the id from the first message (directly, no tool search). It returns `chats` (Ready) and `notifications` (unread). Leave out other "Catch me up" and "Ready sweep" chats.
+   Its `notifications` are the only notifications in the catch-up: just the ones his Settings > Notifications routing sends to Chats (the rest go to badges, the Morning Report or off on purpose). Never read the Notifications app's own inbox or tools, and never report its unread count (wizard-os#758: the raw inbox showed about 69 while his Chats had 3).
 2. Gather the rest from each app's own MCP tools (`mcp__wizard__<app>__*`), only for apps that are installed; skip a missing one silently. Look for: Messenger replies waiting and drafts to send (`messenger_list_drafts`), Tracker items that name him or wait on him, Money (bills, payments or transactions to look at), Mail (unread mail that needs an answer), Second Hand (listings, offers, messages), Card Benefits (offers or credits about to expire). Read Ready chats as the Ready sweep's steps 2 to 4 say before describing one. Never describe something you have not read.
 3. Write it in two steps (Miguel, 20 Nov 2026, wizard-os#758). He reads it top to bottom on his phone and answers by
    voice as he goes, so keep it condensed, accurate and answerable in order. No tables, no A/B/C/D chunks, no
@@ -40,7 +41,10 @@ With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me u
 4. Step one, one Clear all list up front, covering every app: Wizard chats, notifications, Messenger, Mail, WizardOS
    Tracker, Card Benefits, Money, Second Hand (only installed apps that have something). It holds only things that need
    nothing from him: finished or FYI chats to archive, notifications to clear, Messenger chats to mark read, obvious
-   quick approvals. Group under bold app names, number continuously across apps, one short line each saying what it
+   quick approvals. Messenger "mark read" is only for plain chatter and promos, never just because nothing needs a reply:
+   reels, videos and links people sent him (Instagram reels, YouTube links) are things he watches later in batches. Give
+   them their own `to watch` line under **Messenger** (who sent it and how many, e.g. "Messenger · to watch: Pari 4
+   reels, Jan 1 link"), keep them unread, and never mark those chats read, also not on "clear". Group under bold app names, number continuously across apps, one short line each saying what it
    is. Bulk items are one count line ("Mail · 34 unread, nothing for you", "Messenger · 6 chats to mark read"). Mail is
    low signal: almost always one mark-all-read line; list a single mail only when it truly needs his help (then it
    belongs in step two). End with: Reply `clear` or `clear except 7`.
@@ -56,7 +60,8 @@ With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me u
    3. 4 build notifications, all finished.
 
    **Messenger**
-   4. Messenger · 6 chats to mark read
+   4. Messenger · 6 chats to mark read (chatter and promos)
+   Messenger · to watch: Pari 4 reels, Jan 1 link (left unread)
 
    **Mail**
    5. Mail · 34 unread, nothing for you
@@ -66,12 +71,13 @@ With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me u
 
 5. Step two, the Needs-you items, one app at a time in batches of about 3 to 5: Wizard chats and notifications
    together first, then Messenger, Tracker, Card Benefits, Money, Mail, Second Hand. Each item is one numbered line: a
-   bold short name, one sentence of real context read from the source (what the chat or app actually says waits on
-   him; never invented or over-summarised), then a yes/no-style question with your pick in italics, e.g.
-   `3. **Visa:** Pick B1/B2, pay 5,920 THB and book Pari's interview. That's on you. Remind you? *remind*`.
+   bold short name, two short sentences of real context read from the source (who it is, what was said or decided,
+   and what is blocking it; never invented or over-summarised), then a yes/no-style question with your pick in
+   italics, e.g. `3. **Visa:** The agent filled Pari's DS-160 and the embassy offers 4 Dec. Only you can pick B1/B2
+   and pay the 5,920 THB fee. Remind you tonight? *remind*`.
    Messenger needs-you items are drafts to send (send/skip) and replies you can't write alone. Every Ready chat that
    needs him gets its own line: never fold chats together. He answers like "1 to 4 yes, 5 later". Show the first
    batch right after he answers step one (or with step one when it is empty).
 6. Act only on his answer, through the owning app, then say in one short line what you did and show the next batch.
    End with "all clear" or the short list of what is still waiting (the "later" ones).
-7. Never send, archive, pay, reply or retry anything he has not said yes to. "Clear" covers only the step-one list.
+7. Never send, archive, pay, reply or retry anything he has not said yes to. "Clear" covers only the step-one list. The `to watch` line is not part of "clear": those chats stay unread.

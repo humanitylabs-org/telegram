@@ -100,6 +100,7 @@ TOOLS = [
     {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the tg-style skill's Ready sweep section says.",
      'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
     {'name': 'catchup_list', 'description': "What the owner had waiting when he tapped Catch me up: his Ready chats and unread notifications. "
+                                            "These notifications are only the ones his routing sends to Chats: never read the Notifications app's inbox or report its unread count. "
                                             "Without catchup_id: his newest. Each catch-up is a fresh pull; follow the tg-style skill's Catch me up section.",
      'inputSchema': {'type': 'object', 'properties': {'catchup_id': {'type': 'string', 'description': 'From the catch-up chat\'s first message; omit for the newest.'}}}},
 ]
@@ -157,6 +158,9 @@ def get_sweep(sweep_id=None):
 # A fresh pull every time: nothing links one catch-up to the one before (Miguel, 20 Nov 2026) ----
 CATCHUP_ID = re.compile(r'^cu_[0-9]{8}_[0-9]{6}_[0-9a-f]{6}$')
 CATCHUP_KEEP = 30
+# wizard-os#758 follow-up: the raw Notifications inbox (~69 unread) is not what he sees in Chats (3); only these count.
+CATCHUP_NOTES_SCOPE = ('Only the notifications his Settings > Notifications routing sends to Chats. Others go to badges, the '
+                       'Morning Report or off on purpose: never read the Notifications app inbox or report its unread count.')
 
 
 def _catchup_dir():
@@ -222,7 +226,9 @@ def get_catchup(cid=None):
         if not files:
             raise Problem(404, 'No catch-up yet: the owner starts one with Catch me up in the Ready folder.')
         doc = json.loads(files[-1].read_text())
-    return {k: doc.get(k) for k in ('catchup_id', 'created', 'chats', 'notifications')}
+    out = {k: doc.get(k) for k in ('catchup_id', 'created', 'chats', 'notifications')}
+    out['notifications_scope'] = CATCHUP_NOTES_SCOPE
+    return out
 
 
 def rpc(msg):
@@ -506,7 +512,9 @@ SWITCHES = [
      'description': 'In the Ready folder, Sweep becomes Catch me up: one tap starts a catch-up chat in the background (the button spins '
                     'while it runs). When it is done it lands in Ready with everything waiting on you across your '
                     'apps in two steps: first one numbered Clear all list you answer with "clear" (or "clear except 7"), then the items '
-                    'that need you, a few at a time per app, each a short yes/no line. Catch-up replies always show in full.',
+                    'that need you, a few at a time per app, each with two short sentences of context and a yes/no question. Only '
+                    'notifications routed to Chats count; Messenger reels, videos and links stay unread on a "to watch" line. '
+                    'Catch-up replies always show in full.',
      'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758']},
     {'id': 'numbered-models', 'name': 'Numbered model defaults',
      'description': "The chat's model menu shows five rows, Opus, GLM, DeepSeek, Fable and Sol, each the newest version "
