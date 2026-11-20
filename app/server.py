@@ -569,6 +569,10 @@ SWITCHES = [
                     'of everything waiting on you across your apps (Ready chats, Messenger, Tracker, notifications, Money, Mail and more), '
                     'new since your last catch-up first, then works through it in A/B/C chunks with one-word replies.',
      'default': False, 'issues': ['humanitylabs-org/telegram#7']},
+    {'id': 'numbered-models', 'name': 'Numbered model defaults',
+     'description': "The chat's model menu shows five rows, Opus, GLM, DeepSeek, Fable and Sol, each the newest version "
+                    'on this box with its number ("Opus 5.5"); the header pill shows the same numbered name. More models still lists them all.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#13']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
