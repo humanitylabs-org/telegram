@@ -203,6 +203,9 @@ function avatar(host, s, small) {
 }
 // Notifications: the shell's own inbox (WosBell), the same items Chats lists. Read-only here; a tap opens one.
 function notesOf(host) { try { return (host.notes?.items?.() || []).filter(i => i && i.id && !i.archived); } catch (_) { return []; } }
+// The Notifications tab's number is every row it lists, read or not (telegram#33, Miguel, 20 Nov 2026). host.notes only
+// holds Chats-routed items, so badge-only and Morning Report notifications stay out of it.
+export function noteCount(host) { return notesOf(host).length; }
 const notePlain = t => String(t || '').replace(/\[([^\]\n]+)\]\((https?:[^\s)]+)\)/g, '$1').replace(/[*`#>]/g, '').replace(/\s+/g, ' ').trim();
 const noteTitle = it => notePlain(it.title) || notePlain(String(it.message || '').split('\n').find(l => l.trim())) || 'Notification';
 const noteFrom = it => it.appName || it.fromName || it.app || it.from || 'Wizard';
@@ -240,7 +243,7 @@ export default {
       // Switch ready-total: Ready's number is every chat in it, read or not (Miguel, 19 Nov 2026).
       const total = !!host.features?.['ready-total'];
       return { ready: live.filter(s => !isWorking(s) && (total || host.isUnread(s))).length, working: live.filter(isWorking).length,
-        notes: notesOf(host).filter(i => !i.read).length, archive: visible().length - live.length };
+        notes: noteCount(host), archive: visible().length - live.length };
     }
     function notes() {
       const t = i => Number(i.time) || 0;
