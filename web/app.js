@@ -5,6 +5,7 @@ import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
 import { defaultRows as numberedRows, numberedLabel } from './tg-models.js';
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
+import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -206,6 +207,8 @@ function makeNotes() {
     refresh();
   }
   if (P) { refresh(); setInterval(refresh, 30000); addEventListener('focus', refresh); document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); }); }
+  // A route changed anywhere (this picker, its Undo, Settings > Notifications, Chats): refetch what belongs here.
+  if (P) { const onRoute = () => refresh(); try { P.addEventListener('wizard:notify-route', onRoute); addEventListener('pagehide', () => { try { P.removeEventListener('wizard:notify-route', onRoute); } catch (_) {} }); } catch (_) {} }
   return {
     items: () => items,
     watch: fn => { subs.add(fn); refresh(); return () => subs.delete(fn); },
@@ -221,9 +224,10 @@ function makeNotes() {
       try { P?.WosBell?.refresh?.(true); } catch (_) {}
       refresh(); return ok;
     },
-    // Badge only: this app's alerts stop coming to Chats and only count on its icon (Settings > Notifications).
+    // The app a notification routes as (Settings > Notifications); Wizard's own alerts have none to move.
     sourceOf: it => { try { const B = P?.WosBell, id = B?.routeIdOf?.(it); return id && id !== 'notifications' ? { id, name: it.appName || it.fromName || B.nameOf?.(id) || id } : null; } catch (_) { return null; } },
-    badgeOnly(it) { const src = this.sourceOf(it); if (!src) return false; let ok = false; try { ok = !!P.WosBell.setRoute(src.id, 'badge'); } catch (_) {} items = items.filter(i => this.sourceOf(i)?.id !== src.id); emit(); return ok; },
+    // Moved out of Chats (Badge, Morning report, Off): its items leave this list at once.
+    dropSource(id) { items = items.filter(i => this.sourceOf(i)?.id !== id); emit(); },
   };
 }
 
@@ -550,6 +554,7 @@ function start() {
     if (e.target.closest('[data-tg-done]')) { doneAndNext(); return; }
     const row = e.target.closest('[data-chopen]'); if (row) { open(row.dataset.chopen); return; }
     const na = e.target.closest('[data-tg-noteact]'); if (na) { noteAct(na.dataset.tgNoteact); return; }
+    const nr = e.target.closest('.tg-note-route [data-notify-route]'); if (nr) { if (!nr.disabled) noteRoute(nr.dataset.notifyRoute, nr.dataset.notifyTo); return; }
     if (e.target.closest('[data-chnew]')) { open('__new__'); return; }
     if (e.target.closest('[data-tg-back]')) { close(); return; }
     const ab = e.target.closest('[data-tg-attach]'); if (ab) { openAttach(ab); return; }
@@ -643,8 +648,31 @@ function start() {
   function noteAct(act) {
     const it = NOTES.item(thread.slice(5)); if (!it) { close(); return; }
     if (act === 'done') { NOTES.done(it.id).then(ok => { if (!ok) showErr("Couldn't clear it. Try again."); }); close(); return; }
-    if (act === 'badge') { NOTES.badgeOnly(it); close(); return; }
     if (act === 'app' && typeof P?.WizOpenApp === 'function') P.WizOpenApp(it.app || it.from, it.open || '');
+  }
+  // Picked in the note's Chats · Badge · Morning report · Off picker (the shell's own, wizard-os#766).
+  const shellToast = () => { const H = P?.__wos || P?.__wux; return typeof H?.toast === 'function' ? (...a) => H.toast(...a) : null; };
+  function noteRoute(id, to) {
+    const B = P?.WosBell, r = pickRoute(B, id, to, shellToast());
+    if (!r.ok) { showErr("Couldn't change where these go. Try again."); return; }
+    if (!r.changed) return;
+    if (!r.leaves) { repaintNoteRoute(); return; }
+    NOTES.dropSource(id); close();
+    if (!r.undo) undoToast(`${B?.nameOf?.(id) || id} moved to ${B?.routeLabel?.(id) || to}`, () => { try { B.setRoute(id, r.from || 'chats'); } catch (_) {} });
+  }
+  try { P?.addEventListener('wizard:notify-route', () => repaintNoteRoute()); } catch (_) {}
+  // Only the picker row: repainting the whole note would wipe a reply being typed.
+  function repaintNoteRoute() {
+    const row = threadPane.querySelector('.tg-note-route'), it = isNote() ? NOTES.item(thread.slice(5)) : null; if (!row || !it) return;
+    const html = noteRouteHtml(P?.WosBell, NOTES.sourceOf(it)); if (html) row.outerHTML = html;
+  }
+  // Older shells without their own toast: the same Undo, over this window.
+  function undoToast(text, undo) {
+    root.querySelector('.tg-toast')?.remove();
+    const t = document.createElement('p'); t.className = 'tg-toast tg-toast-info'; t.setAttribute('role', 'status');
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Undo';
+    b.addEventListener('click', () => { undo(); t.remove(); });
+    t.append(document.createTextNode(text + ' · '), b); (threadPane || root).append(t);   // inside a .tg-view: its colours t._h = setTimeout(() => t.remove(), 5000);
   }
   function paintNote() {
     const it = NOTES.item(thread.slice(5));
@@ -658,7 +686,7 @@ function start() {
       <div class="ch-head"><button type="button" class="ch-back" data-tg-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="tg-av emo sm tg-note-av">\u{1F514}</span><div class="ti"><b>${esc(it.title || 'Notification')}</b><span class="tg-sub">${esc(from)}</span></div></div>
       <div class="ch-msgs">${when ? `<div class="tg-day"><span>${esc(day(when.toISOString()))}</span></div>` : ''}<div class="msg a"><div class="bub"><div class="tg-text">${rich(text || it.title || '')}</div><span class="mmeta"><time>${when ? esc(clock(when.toISOString())) : ''}</time></span></div></div></div>
       <p class="tg-err" role="status"></p>
-      <div class="tg-ap tg-note-acts"><div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app">Open ${esc(from)}</button>` : ''}${src ? `<button type="button" data-tg-noteact="badge" title="Stop sending ${esc(from)} alerts here; they only count on its icon">Badge only</button>` : ''}<button type="button" class="go" data-tg-done data-wz-key="e" data-wz-key-label="Done, then the next one" title="Done, then the next one (⌥E)">Done</button></div></div>
+      <div class="tg-ap tg-note-acts">${noteRouteHtml(P?.WosBell, src)}<div class="tg-ap-btns">${app ? `<button type="button" data-tg-noteact="app">Open ${esc(from)}</button>` : ''}<button type="button" class="go" data-tg-done data-wz-key="e" data-wz-key-label="Done, then the next one" title="Done, then the next one (⌥E)">Done</button></div></div>
       ${composerHtml(false)}
     </div>`;
     const ta = threadPane.querySelector('.ch-compose textarea'); if (ta) ta.placeholder = 'Reply to start a chat about this';
