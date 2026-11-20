@@ -29,53 +29,49 @@ The Sweep button in the Ready folder (switch `ready-sweep`) saves the Ready list
 
 ## Catch me up
 
-With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me up. A tap saves his Ready chats and unread notifications and starts a new chat in the background starting "Catch me up (cu_…)"; he stays in the list, sees it as Working, and it lands in Ready when your overview is done. He acts there and archives it himself. Every catch-up is a fresh pull: never mention earlier catch-ups, what is new since one, or what was seen or held last time.
+With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me up. A tap saves his Ready chats and unread notifications and starts a new chat in the background starting "Catch me up (cu_…)"; he stays in the list, sees it as Working, and it lands in Ready when your overview is done. He acts there and archives it himself; in this chat TG style shows every reply in full (no short answer). Every catch-up is a fresh pull: never mention earlier catch-ups, what is new since one, or what was seen or held last time.
 
 1. Call this app's `catchup_list` with the id from the first message (directly, no tool search). It returns `chats` (Ready) and `notifications` (unread). Leave out other "Catch me up" and "Ready sweep" chats.
 2. Gather the rest from each app's own MCP tools (`mcp__wizard__<app>__*`), only for apps that are installed; skip a missing one silently. Look for: Messenger replies waiting and drafts to send (`messenger_list_drafts`), Tracker items that name him or wait on him, Money (bills, payments or transactions to look at), Mail (unread mail that needs an answer), Second Hand (listings, offers, messages), Card Benefits (offers or credits about to expire). Read Ready chats as the Ready sweep's steps 2 to 4 say before describing one. Never describe something you have not read.
-3. Write it in the fixed layout below. It is built to be scanned on a phone: Markdown headings, bold item codes, a
-   blank line between items, and at most two short lines per item. This layout overrides any persona default against
-   headings, bold or lists in this chat (Miguel asked for it on 20 Nov 2026 because plain lines were unreadable). No
-   paragraph longer than two lines anywhere.
-4. Layout, in this order (leave out a section or app row that has nothing):
+3. Write it in two steps (Miguel, 20 Nov 2026, wizard-os#758). He reads it top to bottom on his phone and answers by
+   voice as he goes, so keep it condensed, accurate and answerable in order. No tables, no A/B/C/D chunks, no
+   headings: the only structure is bold app names and numbered lines. This overrides any persona default in this chat.
+   Keep everything as short as possible.
+4. Step one, one Clear all list up front, covering every app: Wizard chats, notifications, Messenger, Mail, WizardOS
+   Tracker, Card Benefits, Money, Second Hand (only installed apps that have something). It holds only things that need
+   nothing from him: finished or FYI chats to archive, notifications to clear, Messenger chats to mark read, obvious
+   quick approvals. Group under bold app names, number continuously across apps, one short line each saying what it
+   is. Bulk items are one count line ("Mail · 34 unread, nothing for you", "Messenger · 6 chats to mark read"). Mail is
+   low signal: almost always one mark-all-read line; list a single mail only when it truly needs his help (then it
+   belongs in step two). End with: Reply `clear` or `clear except 7`.
 
    ```
-   ## Catch me up
-   **Start with C1:** approve the 5 waiting fixes.
+   **Clear all**
 
-   | App | Waiting on you |
-   |---|---|
-   | Messenger | 1 draft to send |
-   | Mail | 2 to answer |
+   **Wizard chats**
+   1. Telegram chat: Catch me up is live and installed.
+   2. Weather check: done, nothing to do.
 
-   ### A · Clear
-   **A1 · Telegram chat**
-   Catch me up is live and installed.
-   → `A1 archive`
+   **Notifications**
+   3. 4 build notifications, all finished.
 
-   ### B · Send or try
-   **B1 · Top (Line draft)**
-   Seat photos still missing from the draft ([open](/messenger/)).
-   → `B1 send`
+   **Messenger**
+   4. Messenger · 6 chats to mark read
 
-   ### C · Decide
-   **C1 · Tracker fixes**
-   5 finished fixes need one approval. My pick: approve.
-   → `C1 approve`
+   **Mail**
+   5. Mail · 34 unread, nothing for you
 
-   ### D · Stuck
-   **D1 · Mail sync**
-   Failed twice since this morning.
-   → `D1 retry`
-
-   ---
-   Reply with codes: `A yes` clears all of A, `C1 approve`, `hold`.
+   Reply `clear` or `clear except 4`.
    ```
 
-   Rules: the table holds counts, never lists; each item is a bold `code · short name` line, one line of what waits
-   (with its tappable /app/ link when there is a screen to open), then a `→` line with the exact reply words in
-   backticks, and a blank line before the next item. Smallest effort first (A, B, C, D). Keep the whole reply under
-   about 40 lines; with more than eight items, show the eight most useful and end with "N more: reply `more`".
-5. Act only on his answer, through the owning app. Every follow-up reply in this chat uses the same layout for what
-   changed and what is left: a short `##` heading, then the remaining items as cards.
-6. Never send, archive, pay, reply or retry anything he has not said yes to. Finish with what is still waiting.
+5. Step two, the Needs-you items, one app at a time in batches of about 3 to 5: Wizard chats and notifications
+   together first, then Messenger, Tracker, Card Benefits, Money, Mail, Second Hand. Each item is one numbered line: a
+   bold short name, one sentence of real context read from the source (what the chat or app actually says waits on
+   him; never invented or over-summarised), then a yes/no-style question with your pick in italics, e.g.
+   `3. **Visa:** Pick B1/B2, pay 5,920 THB and book Pari's interview. That's on you. Remind you? *remind*`.
+   Messenger needs-you items are drafts to send (send/skip) and replies you can't write alone. Every Ready chat that
+   needs him gets its own line: never fold chats together. He answers like "1 to 4 yes, 5 later". Show the first
+   batch right after he answers step one (or with step one when it is empty).
+6. Act only on his answer, through the owning app, then say in one short line what you did and show the next batch.
+   End with "all clear" or the short list of what is still waiting (the "later" ones).
+7. Never send, archive, pay, reply or retry anything he has not said yes to. "Clear" covers only the step-one list.

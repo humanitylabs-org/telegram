@@ -4,7 +4,7 @@
 import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
 import { defaultRows as numberedRows, numberedLabel } from './tg-models.js';
-import { catchupRunning, catchupMessage } from './tg-catchup.js';
+import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -1047,6 +1047,8 @@ function start() {
     const folded = new Set();
     for (let i = 0; i < msgs.length; i++) if (msgs[i].role === 'assistant' && msgs[i + 1]?.role === 'assistant') folded.add(i);
     let foldOpen = false;
+    // Switch catch-me-up: a catch-up chat shows every reply expanded (wizard-os#758).
+    const fullReplies = host.features?.['catch-me-up'] === true && isCatchupChat(msgs);
     for (let i = 0; i < msgs.length; i++) {
       const m = msgs[i];
       if (folded.has(i) && !folded.has(i - 1)) { let n = 0; while (folded.has(i + n)) n++; body += `<details class="tg-fold"><summary><span>${n} in-between ${n === 1 ? 'message' : 'messages'}</span></summary>`; foldOpen = true; }
@@ -1055,7 +1057,7 @@ function start() {
       const files = (m.files || []).map(fileHtml).join('');
       const hide = files && ['🎤 Voice message', '📎'].includes(m.text);
       const text = m.text && !hide ? (u ? esc(m.text).replace(/\n/g, '<br>') : rich(m.text)) : '';
-      const lead = !u && summaryOf(m), rk = esc(String(m.id ?? m.timestamp)), open = lead && (rsumOpen.get(String(m.id ?? m.timestamp)) ?? summaryStartsOpen());
+      const lead = !u && !fullReplies && summaryOf(m), rk = esc(String(m.id ?? m.timestamp)), open = lead && (rsumOpen.get(String(m.id ?? m.timestamp)) ?? summaryStartsOpen());
       const shown = !text ? '' : !lead ? `<div class="tg-text">${text}</div>`
         : `<button type="button" class="tg-rsum" data-tg-rsum="${rk}" aria-expanded="false"${open ? ' hidden' : ''}><span>${esc(/[.!?…"'”’»]$/u.test(lead) ? lead : lead + '.')}</span><i class="tg-chev" aria-hidden="true"></i></button>`
           + `<div class="tg-rdet"${open ? '' : ' hidden'}><div class="tg-text">${text}</div><button type="button" class="tg-rless" data-tg-rsum="${rk}" aria-expanded="true">Show less<i class="tg-chev up" aria-hidden="true"></i></button></div>`;

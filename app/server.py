@@ -504,9 +504,10 @@ SWITCHES = [
      'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'catch-me-up', 'name': 'Catch me up',
      'description': 'In the Ready folder, Sweep becomes Catch me up: one tap starts a catch-up chat in the background (the button spins '
-                    'while it runs). When it is done it lands in Ready with a one-screen overview of everything waiting on you across your '
-                    'apps (Ready chats, Messenger, Tracker, notifications, Money, Mail and more), then A/B/C chunks you answer with one word.',
-     'default': False, 'issues': ['humanitylabs-org/telegram#7']},
+                    'while it runs). When it is done it lands in Ready with everything waiting on you across your '
+                    'apps in two steps: first one numbered Clear all list you answer with "clear" (or "clear except 7"), then the items '
+                    'that need you, a few at a time per app, each a short yes/no line. Catch-up replies always show in full.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758']},
     {'id': 'numbered-models', 'name': 'Numbered model defaults',
      'description': "The chat's model menu shows five rows, Opus, GLM, DeepSeek, Fable and Sol, each the newest version "
                     'on this box with its number ("Opus 5.5"); the header pill shows the same numbered name. More models still lists them all.',
