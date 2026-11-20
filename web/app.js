@@ -869,7 +869,8 @@ function start() {
     try {
       // Phones use the plain recorder: the shell's keeps echo cancellation on phones, which stops the owner's music.
       const v = P.WizCore?.voice && !PHONE ? P.WizCore.voice({ onState() {}, onLevel() {} }) : plainRecorder();
-      rec = { v, at: Date.now() };
+      // The note belongs to the chat it was started in, even if he opens another chat before it is sent (Miguel, 20 Nov 2026).
+      rec = { v, at: Date.now(), thread, tray };
       paintComposer();
       await v.start();
       recT = setInterval(() => { const t = root.querySelector('.tg-rec-time'); if (t && rec) t.textContent = fmtTime(Date.now() - rec.at); }, 250);
@@ -886,11 +887,15 @@ function start() {
       const ext = /mp4|m4a|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm';
       const file = new File([out.blob], `wizard-voice-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`, { type });
       const f = await upload(file);
-      for (let i = 0; i < 120 && tray.some(t => t.uploading); i++) await new Promise(r => setTimeout(r, 250));
-      const extra = tray.map(t => t.id).filter(Boolean), sent = tray; tray = [];
+      // Still in the chat it was recorded in: take that chat's attachments. Opened another chat meanwhile: take the
+      // attachments that waited in the recording's own chat, never the ones now on screen.
+      const here = () => r.thread === thread, files = here() ? tray : r.tray;
+      for (let i = 0; i < 120 && files.some(t => t.uploading); i++) await new Promise(r => setTimeout(r, 250));
+      const extra = files.map(t => t.id).filter(Boolean);
+      if (files === tray) tray = [];
       paintComposer();
-      try { await deliver((out.text || '').trim() || '🎤 Voice message', [f.id, ...extra]); }
-      catch (e) { tray = sent; paintTray(); throw e; }
+      try { await deliver((out.text || '').trim() || '🎤 Voice message', [f.id, ...extra], r.thread); }
+      catch (e) { if (here()) { tray = files; paintTray(); } throw e; }
     } catch (e) { paintComposer(); showErr(e.message || 'Voice note failed'); }
   }
 
@@ -906,15 +911,16 @@ function start() {
     try { await deliver(text || '📎', ids); }
     catch (e) { tray = sent; draft = text; paintThread(); const t = root.querySelector('.ch-compose textarea'); if (t && !t.value) t.value = text; syncSend(); showErr(e.message || 'Could not send'); }
   }
-  async function deliver(text, fileIds = []) {
+  async function deliver(text, fileIds = [], target = thread) {
+    // Sent from a chat he has since left (a voice note still uploading or transcribing): send it there, paint nothing here.
+    if (target && target !== thread) return deliverAway(text, fileIds, target);
     if (sending) throw new Error('Still sending the last message');
     sending = true;
     // A reply to a notification starts a new chat that carries it, then clears the notification.
     let noteId = '', prevThread = thread;
     if (isNote()) {
       const it = NOTES.item(thread.slice(5)); noteId = it?.id || '';
-      if (it) { const body = String(it.details || it.message || '').replace(/\n*\[SILENT\]\s*/g, '\n').trim().slice(0, 1500);
-        text = `Re: notification "${it.title || 'Notification'}"${it.appName || it.fromName ? ` from ${it.appName || it.fromName}` : ''}\n> ${body.split('\n').join('\n> ')}\n\n${text}`; }
+      if (it) text = noteReply(it, text);
       thread = '__new__'; msgs = [];
     }
     msgs.push({ id: 'pending', role: 'user', text, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
@@ -925,6 +931,23 @@ function start() {
       msgSig = ''; setTimeout(() => { load(); follow(); }, 700);
     } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
     finally { sending = false; }
+  }
+  function noteReply(it, text) {
+    const body = String(it.details || it.message || '').replace(/\n*\[SILENT\]\s*/g, '\n').trim().slice(0, 1500);
+    return `Re: notification "${it.title || 'Notification'}"${it.appName || it.fromName ? ` from ${it.appName || it.fromName}` : ''}\n> ${body.split('\n').join('\n> ')}\n\n${text}`;
+  }
+  // A voice note finished after he opened another chat: it goes to the chat it was recorded in (a reply there, a new
+  // chat when it began in New chat or on a notification), and the chat now on screen stays as it is (Miguel, 20 Nov 2026).
+  async function deliverAway(text, fileIds, target) {
+    const opts = fileIds.length ? { fileIds } : {};
+    let noteId = '';
+    if (String(target).startsWith('note:')) {
+      const it = NOTES.item(target.slice(5)); noteId = it?.id || '';
+      if (it) text = noteReply(it, text);
+      target = '__new__';
+    }
+    if (target === '__new__') { if (newPick) Object.assign(opts, newPick); await LIVE.send(text, opts); if (noteId) NOTES.done(noteId); }
+    else await LIVE.reply(target, text, opts);
   }
   function showErr(text) {
     const err = [...root.querySelectorAll('.tg-err')].find(e => e.getClientRects().length) || null;
