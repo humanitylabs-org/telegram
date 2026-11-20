@@ -123,7 +123,10 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-rename-btns { display: flex; justify-content: flex-end; gap: 8px; }
 .tg-rename-btns button { padding: 8px 14px; }
 .tg-view.tg-view .ch-compose .ch-attach { width: 46px; height: 46px; }
-.tg-view.tg-view .ch-compose .ch-attach svg { fill: none; stroke: var(--tg-sub); }
+/* Skins (landscapes, obsidian) layer an !important stroke: var(--ink-2) on the attach icon, and --ink-2 is not
+   defined in this frame, so the paperclip drew nothing (#22). (0,4,1) beats the skin's (0,3,3) among !important. */
+.tg-view.tg-view .ch-compose .ch-attach { color: var(--tg-sub, #8a8a8a) !important; }
+.tg-view.tg-view .ch-compose .ch-attach svg { fill: none !important; stroke: var(--tg-sub, #8a8a8a) !important; }
 .tg-view.tg-view .ch-compose .tg-sendbtn { width: 46px; height: 46px; background: var(--tg-primary); }
 .tg-view.tg-view .tg-recbar { display: flex; align-items: center; }
 .tg-view.tg-view .tg-recbar .tg-rec-x { background: none; box-shadow: none; }
