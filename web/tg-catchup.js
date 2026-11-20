@@ -20,11 +20,14 @@ export function catchupMessage(cu) {
     text: `\u2728 Catch me up (${cu.catchup_id})`,
     instructions: `Catch me up from the TG style app. Load the tg-style skill and follow its Catch me up section. `
       + `Start with the tg-style app's catchup_list tool (mcp__wizard__tg_style__catchup_list), catchup_id ${cu.catchup_id}; `
-      + `it has ${n} Ready chat(s) and ${a} unread notification(s). Then check the owner's other installed apps as the skill says. `
+      + `it has ${n} Ready chat(s) and ${a} unread notification(s). Those are the only notifications to cover (what his routing sends to Chats): `
+      + `never read the Notifications app's own inbox or report its unread count. Then check the owner's other installed apps as the skill says. `
       + `This is a fresh pull: say nothing about earlier catch-ups. `
       + `Write it in the skill's two-step layout: first one numbered Clear all list for every app (bold app names, one short line each, `
-      + `he replies "clear" or "clear except 7"), then the Needs-you items one app at a time in batches of 3 to 5 (bold short name, `
-      + `one sentence read from the source, a yes/no question with your pick in italics). No tables, no A/B/C/D chunks, no headings.`,
+      + `he replies "clear" or "clear except 7"); in Messenger only plain chatter and promos are marked read, and reels, videos and links `
+      + `people sent him go on their own "to watch" line (who sent it, how many) and stay unread. Then the Needs-you items one app at a time `
+      + `in batches of 3 to 5 (bold short name, two short sentences read from the source: who, what was said or decided, what is blocking it; `
+      + `then a yes/no question with your pick in italics). No tables, no A/B/C/D chunks, no headings.`,
   };
 }
 

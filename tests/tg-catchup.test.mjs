@@ -33,6 +33,16 @@ test('message is a fresh pull, no earlier-catch-up logic', () => {
   assert.doesNotMatch(m.instructions, /app table|### A/);
 });
 
+test('follow-ups (wizard-os#758): routed notifications only, Messenger to watch, two sentences of context', () => {
+  const m = catchupMessage({ catchup_id: 'cu_20261120_000000_abcdef', chats: 1, notifications: 3 });
+  assert.match(m.instructions, /only notifications to cover \(what his routing sends to Chats\)/);
+  assert.match(m.instructions, /never read the Notifications app's own inbox or report its unread count/);
+  assert.match(m.instructions, /reels, videos and links/);
+  assert.match(m.instructions, /"to watch" line \(who sent it, how many\) and stay unread/);
+  assert.match(m.instructions, /two short sentences read from the source: who, what was said or decided, what is blocking it/);
+  assert.doesNotMatch(m.instructions, /one sentence read from the source/);
+});
+
 test('catch-up chat is told by its first message (wizard-os#758)', () => {
   const m = catchupMessage({ catchup_id: 'cu_20261120_000000_abcdef', chats: 0, notifications: 0 });
   assert.equal(isCatchupChat([{ role: 'user', text: m.text }, { role: 'assistant', text: 'x' }]), true);
