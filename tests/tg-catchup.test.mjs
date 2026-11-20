@@ -1,7 +1,7 @@
 // node --test tests/tg-catchup.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { catchupRunning, catchupMessage, START_GRACE_MS } from '../web/tg-catchup.js';
+import { catchupRunning, catchupMessage, isCatchupChat, START_GRACE_MS } from '../web/tg-catchup.js';
 
 test('no catch-up yet: not running', () => {
   assert.equal(catchupRunning(null, null), false);
@@ -27,5 +27,19 @@ test('message is a fresh pull, no earlier-catch-up logic', () => {
   assert.match(m.instructions, /catchup_list/);
   assert.match(m.instructions, /3 Ready chat\(s\) and 2 unread/);
   assert.doesNotMatch(m.instructions, /catchup_record|previous/);
-  assert.match(m.instructions, /fixed phone layout/);
+  assert.match(m.instructions, /two-step layout/);
+  assert.match(m.instructions, /Clear all/);
+  assert.match(m.instructions, /No tables, no A\/B\/C\/D chunks/);
+  assert.doesNotMatch(m.instructions, /app table|### A/);
+});
+
+test('catch-up chat is told by its first message (wizard-os#758)', () => {
+  const m = catchupMessage({ catchup_id: 'cu_20261120_000000_abcdef', chats: 0, notifications: 0 });
+  assert.equal(isCatchupChat([{ role: 'user', text: m.text }, { role: 'assistant', text: 'x' }]), true);
+  assert.equal(isCatchupChat([{ role: 'user', text: 'Catch me up (cu_20261120_000000_abcdef)' }]), true);
+  assert.equal(isCatchupChat([{ role: 'assistant', text: 'hi' }, { role: 'user', text: m.text }]), true);
+  assert.equal(isCatchupChat([{ role: 'user', text: 'Please catch me up (cu_x) later' }]), false);
+  assert.equal(isCatchupChat([{ role: 'user', text: 'Sweep my Ready list: 3 chats (sw_1)' }, { role: 'user', text: m.text }]), false);
+  assert.equal(isCatchupChat([]), false);
+  assert.equal(isCatchupChat(null), false);
 });

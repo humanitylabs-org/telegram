@@ -39,7 +39,7 @@ class CatchupTest(unittest.TestCase):
     def test_switch_listed_off_with_issue(self):
         sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
         self.assertFalse(sw['catch-me-up']['on'])
-        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7'])
+        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758'])
         self.assertFalse(sw['numbered-models']['on'])
         self.assertEqual(sw['numbered-models']['issues'], ['humanitylabs-org/telegram#13'])
 

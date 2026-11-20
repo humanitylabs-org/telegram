@@ -22,6 +22,16 @@ export function catchupMessage(cu) {
       + `Start with the tg-style app's catchup_list tool (mcp__wizard__tg_style__catchup_list), catchup_id ${cu.catchup_id}; `
       + `it has ${n} Ready chat(s) and ${a} unread notification(s). Then check the owner's other installed apps as the skill says. `
       + `This is a fresh pull: say nothing about earlier catch-ups. `
-      + `Write it in the skill's fixed phone layout (## heading, app table, ### A/B/C/D sections, one bold card per item), even if your persona avoids headings.`,
+      + `Write it in the skill's two-step layout: first one numbered Clear all list for every app (bold app names, one short line each, `
+      + `he replies "clear" or "clear except 7"), then the Needs-you items one app at a time in batches of 3 to 5 (bold short name, `
+      + `one sentence read from the source, a yes/no question with your pick in italics). No tables, no A/B/C/D chunks, no headings.`,
   };
+}
+
+// A catch-up chat (its first message starts "Catch me up (cu_", wizard-os#758) shows every reply in full in TG style:
+// the catch-up is already as short as it can be, so no collapsed short answer there.
+const CATCHUP_FIRST = /^\W*Catch me up \(cu_/u;
+export function isCatchupChat(msgs) {
+  const first = (msgs || []).find(m => m && m.role === 'user');
+  return !!first && CATCHUP_FIRST.test(String(first.text || ''));
 }
