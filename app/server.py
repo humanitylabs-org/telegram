@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'tg-style'
-VERSION = '0.8.22'
+VERSION = '0.8.23'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -99,6 +99,15 @@ TOOLS = [
     {'name': 'wizard_echo', 'description': 'Echo text to prove this app is reachable.', 'inputSchema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text']}},
     {'name': 'sweep_list', 'description': "The chats the owner had in his Ready folder when he tapped Sweep (id, title, status, ask, preview, time, unread). Without sweep_id: his newest sweep. Work them in chunks as the tg-style skill's Ready sweep section says.",
      'inputSchema': {'type': 'object', 'properties': {'sweep_id': {'type': 'string', 'description': 'From the sweep chat\'s first message; omit for the newest.'}}}},
+    {'name': 'catchup_list', 'description': "What the owner's Catch me up button saved when he tapped it: his Ready chats and unread notifications at that moment, plus `previous` (the last catch-up's time and what it showed and he decided), so you can mark items new since then. Without catchup_id: his newest. Collect every other app's waiting items yourself as the tg-style skill's Catch me up section says.",
+     'inputSchema': {'type': 'object', 'properties': {'catchup_id': {'type': 'string', 'description': 'From the catch-up chat\'s first message (cu_...); omit for the newest.'}}}},
+    {'name': 'catchup_record', 'description': "Save what this catch-up showed and what the owner decided on each item, so the next catch-up can say what is new and what he held. Call it once the overview is out, and again as decisions come in (each call replaces the list).",
+     'inputSchema': {'type': 'object', 'required': ['catchup_id', 'items'], 'properties': {
+         'catchup_id': {'type': 'string'},
+         'items': {'type': 'array', 'maxItems': 300, 'items': {'type': 'object', 'required': ['key'], 'properties': {
+             'key': {'type': 'string', 'description': 'Stable id: source plus that app\'s own id, e.g. chat:<session id>, messenger:<chat id>, tracker:<owner/repo#n>, money:<txn id>.'},
+             'source': {'type': 'string'}, 'title': {'type': 'string'},
+             'decision': {'type': 'string', 'description': 'open, done, archived, held, sent, skipped (or his words, short).'}}}}}}},
 ]
 
 
@@ -150,6 +159,90 @@ def get_sweep(sweep_id=None):
     return json.loads(f.read_text())
 
 
+# ---- Catch me up (switch catch-me-up): the same snapshot as a sweep, plus unread notifications and a memory of
+# the last catch-up, so the agent can split "new since last time" from "still waiting" (Miguel, 20 Nov 2026) ----
+CATCHUP_ID = re.compile(r'^cu_[0-9]{8}_[0-9]{6}_[0-9a-f]{6}$')
+
+
+def _catchup_dir():
+    d = DATA / 'catchups'
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _catchup_file(cid):
+    if not CATCHUP_ID.match(str(cid or '')):
+        raise Problem(400, 'Unknown catch-up id.')
+    return _catchup_dir() / (cid + '.json')
+
+
+def save_catchup(body):
+    items, notes = body.get('items') or [], body.get('notes') or []
+    if not isinstance(items, list) or not isinstance(notes, list) or len(items) > 400 or len(notes) > 200:
+        raise Problem(400, 'items (up to 400 chats) and notes (up to 200) must be lists.')
+    chats = []
+    for it in items:
+        if not isinstance(it, dict) or not isinstance(it.get('id'), str) or not 0 < len(it['id']) <= 120:
+            raise Problem(400, 'Each item needs a chat id.')
+        chats.append({'id': it['id'], 'title': _clip(it.get('title'), 120), 'status': _clip(it.get('status'), 40),
+                      'state': _clip(it.get('state'), 20), 'ask': _clip(it.get('ask'), 300), 'preview': _clip(it.get('preview'), 300),
+                      'time': _clip(it.get('time'), 40), 'unread': bool(it.get('unread'))})
+    nts = []
+    for n in notes:
+        if not isinstance(n, dict) or not isinstance(n.get('id'), str) or not 0 < len(n['id']) <= 120:
+            raise Problem(400, 'Each note needs an id.')
+        nts.append({'id': n['id'], 'title': _clip(n.get('title'), 200), 'from': _clip(n.get('from'), 60), 'time': _clip(n.get('time'), 40)})
+    d = _catchup_dir()
+    prev = None
+    olds = sorted(d.glob('cu_*.json'))
+    if olds:
+        try:
+            p = json.loads(olds[-1].read_text())
+            prev = {'catchup_id': p.get('catchup_id'), 'created': p.get('created'), 'recorded': p.get('recorded') or [],
+                    'chats': [c.get('id') for c in p.get('chats') or []], 'notes': [n.get('id') for n in p.get('notes') or []]}
+        except (OSError, ValueError):
+            prev = None
+    now = time.time()  # the suffix starts with the milliseconds, so ids sort in the order they were made
+    cid = time.strftime('cu_%Y%m%d_%H%M%S_', time.gmtime(now)) + f'{int(now * 1000) % 1000:03d}' + os.urandom(2).hex()[:3]
+    doc = {'catchup_id': cid, 'created': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now)), 'count': len(chats),
+           'notes_count': len(nts), 'chats': chats, 'notes': nts, 'previous': prev, 'recorded': []}
+    (d / (cid + '.json')).write_text(json.dumps(doc))
+    for old in sorted(d.glob('cu_*.json'))[:-30]:  # keep the last 30
+        old.unlink(missing_ok=True)
+    return {'catchup_id': cid, 'count': len(chats), 'notes_count': len(nts), 'since': prev and prev.get('created')}
+
+
+def get_catchup(cid=None):
+    if cid:
+        f = _catchup_file(cid)
+    else:
+        all_ = sorted(_catchup_dir().glob('cu_*.json'))
+        f = all_[-1] if all_ else None
+    if not f or not f.is_file():
+        raise Problem(404, 'No catch-up yet: the owner starts one with Catch me up in the Ready folder.')
+    return json.loads(f.read_text())
+
+
+def record_catchup(a):
+    f = _catchup_file(a.get('catchup_id'))
+    if not f.is_file():
+        raise Problem(404, 'Unknown catch-up id.')
+    items = a.get('items')
+    if not isinstance(items, list) or len(items) > 300:
+        raise Problem(400, 'items must be a list of up to 300.')
+    rows = []
+    for it in items:
+        if not isinstance(it, dict) or not isinstance(it.get('key'), str) or not 0 < len(it['key']) <= 200:
+            raise Problem(400, 'Each item needs a key.')
+        rows.append({'key': it['key'], 'source': _clip(it.get('source'), 40), 'title': _clip(it.get('title'), 160),
+                     'decision': _clip(it.get('decision') or 'open', 60)})
+    doc = json.loads(f.read_text())
+    doc['recorded'] = rows
+    doc['recorded_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    f.write_text(json.dumps(doc))
+    return {'catchup_id': doc['catchup_id'], 'recorded': len(rows)}
+
+
 def rpc(msg):
     if not isinstance(msg, dict):
         return {'jsonrpc': '2.0', 'id': None, 'error': {'code': -32600, 'message': 'Expected a JSON-RPC object.'}}
@@ -177,6 +270,10 @@ def rpc(msg):
                 value = {'text': str(a.get('text', ''))}
             elif n == 'sweep_list':
                 value = get_sweep(a.get('sweep_id'))
+            elif n == 'catchup_list':
+                value = get_catchup(a.get('catchup_id'))
+            elif n == 'catchup_record':
+                value = record_catchup(a)
             else:
                 return {'jsonrpc': '2.0', 'id': i, 'error': {'code': -32602, 'message': 'Unknown tool.'}}
             r = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': False}
@@ -356,7 +453,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(415, {'error': 'Use application/json.'})
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if not 0 <= size <= (524288 if path == '/api/sweep' else 65536):  # a sweep carries the whole Ready list
+            if not 0 <= size <= (524288 if path in ('/api/sweep', '/api/catchup') else 65536):  # a sweep carries the whole Ready list
                 return self.send(413, {'error': 'Request too large.'})
             body = json.loads(self.rfile.read(size))
             if path == '/mcp':
@@ -377,6 +474,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'text': str(body.get('text', ''))})
             if path == '/api/sweep':
                 return self.send(201, save_sweep(body))
+            if path == '/api/catchup':
+                return self.send(201, save_catchup(body))
             self.send(404, {'error': 'Not found.'})
         except Problem as e:
             self.send(e.code, {'error': e.message})
@@ -420,6 +519,11 @@ SWITCHES = [
      'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
                     'in sensible chunks, so you can archive, answer or keep them in bulk.',
      'default': False, 'issues': ['humanitylabs-org/telegram#5']},
+    {'id': 'catch-me-up', 'name': 'Catch me up',
+     'description': 'Sweep becomes Catch me up: one tap opens a chat where your agent shows everything waiting on you across '
+                    'your apps (Ready chats, Messenger, Tracker, notifications, Money, Mail, Second Hand, Card Benefits), new '
+                    'since last time first, and works through it with you. Off brings back the Ready-only Sweep.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#7']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')

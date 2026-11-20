@@ -1,7 +1,7 @@
 ---
 name: tg-style
 description: Use when the owner asks about the Telegram look for his chats.
-version: 0.8.22
+version: 0.8.23
 author: Oscar (Hermes Agent)
 license: GPL-3.0-only
 platforms: [linux, macos]
@@ -26,3 +26,16 @@ The Sweep button in the Ready folder (switch `ready-sweep`) saves the Ready list
 6. Group into chunks labelled A, B, C, smallest effort first: finished or FYI (archive); things to try or send (with the link); decisions only he can make (your pick plus reply words); failed or stuck (offer a retry). Within a chunk, number every chat on one line: title and date, what it waits on, your suggestion. Plain lines, no bold headings. Numbered lines are fine here so he can answer "A yes", "B2 archive", "C1 go", "hold".
 7. Act only on his answer, then say what changed and how many are left. Archive with `PATCH /api/sessions/<id>` body `{"archived": true}` (reversible: `false` restores). To pass his decision to a chat's own agent, start a run there with `POST /v1/runs` body `{"session_id": "<id>", "input": "<his words>"}` and tell him it went. "Hold" or "skip" leaves the chat in Ready; bring held ones back at the end.
 8. Never archive, answer or retry anything he has not said yes to, and never touch chats outside the sweep list. Finish with the count still in Ready, and offer to archive the sweep chat itself.
+
+## Catch me up
+
+With switch `catch-me-up` on, the Ready folder's button reads Catch me up and covers every app, not just Ready. It saves the Ready chats and unread notifications he had and opens a new chat starting "Catch me up (cu_…)". The goal is one short overview, then a quick interactive pass he can stop at any time. Never one giant message.
+
+1. Call `catchup_list` with the id from the first message (directly, no tool search). It returns `chats` (Ready), `notes` (unread notifications) and `previous` (the last catch-up's time, what it showed and what he decided). Leave out other catch-up and sweep chats.
+2. Gather what waits on him, in parallel, from each installed app's own tools (skip an app that isn't installed or errors, and say so in one line): Ready chats (check them as Ready sweep steps 1 to 4 say), Messenger (`messenger_chats_needing_draft`, plus `messenger_list_drafts` for drafts he hasn't sent), WizardOS Tracker (his Human review items, builder questions asked of him, approvals for him, goals he owns with an old status; give each card's link), Money (`money_overview`: banks needing him, transactions to review), Mail (`mail_list` unread, inbox only; real people and things to act on, not newsletters), Second Hand (`secondhand_items`: what needs the owner), Card Benefits (`benefits_overview`: tasks and refunds waiting, benefits about to lapse), and the saved unread notifications.
+3. Mark each item new or still waiting by comparing with `previous.recorded` (key = source plus that app's id, e.g. `chat:<id>`, `messenger:<chat id>`, `tracker:<owner/repo#n>`). FYI-only things (notifications, finished chats, money changes) show only if new since last time. Things he held last time stay. With no previous catch-up, everything is new.
+4. First reply: the overview only. One line per app that has something ("Messenger: 3 to reply, 1 new"), quiet apps folded into one "Nothing waiting in …" line, the time since the last catch-up, and the first chunk. Keep it to one screen.
+5. Then work in chunks labelled A, B, C as in Ready sweep step 6 (smallest effort first, new before old, one numbered line per item with the link and your suggestion, plain lines). He answers "A yes", "B2 archive", "C1 go", "hold", "just Messenger" or "stop".
+6. Act only on his answer, with each app's own tools and the Ready sweep rules for chats. Messenger replies are drafts he sends himself; never send, pay, approve or archive anything he has not said yes to.
+7. Call `catchup_record` with every item shown and its decision (`open`, `done`, `archived`, `held`, `sent`, `skipped`) once the overview is out, and again whenever decisions change. That is what the next catch-up compares against. "Fresh catch me up" means ignore `previous`.
+8. Finish with what is still waiting per app, and offer to archive the catch-up chat itself.

@@ -46,9 +46,15 @@ const CSS = `
 /* Tapped: the broom sweeps back and forth and a shimmer runs across until the sweep chat opens (Miguel, 19 Nov 2026). */
 .tg-sweep.busy { cursor: progress; background: linear-gradient(90deg, var(--tg-hover) 0%, color-mix(in srgb, var(--tg-primary) 28%, var(--tg-hover)) 50%, var(--tg-hover) 100%) 0 0 / 200% 100%; animation: tg-shimmer 1.1s linear infinite; }
 .tg-sweep.busy svg { transform-origin: 70% 30%; animation: tg-broom .45s ease-in-out infinite alternate; }
+/* Catch me up: the same pill with a sparkle that twinkles while the agent gathers (Miguel, 20 Nov 2026). */
+.tg-sweep.cmu { white-space: nowrap; }
+.tg-top h1 { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-sweep.cmu svg { width: 17px; height: 17px; }
+.tg-sweep.cmu.busy svg { transform-origin: 50% 50%; animation: tg-twinkle .7s ease-in-out infinite alternate; }
+@keyframes tg-twinkle { from { transform: scale(.82) rotate(-12deg); opacity: .7; } to { transform: scale(1.08) rotate(12deg); opacity: 1; } }
 @keyframes tg-shimmer { to { background-position: -200% 0; } }
 @keyframes tg-broom { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
-@media (prefers-reduced-motion: reduce) { .tg-sweep.busy, .tg-sweep.busy svg { animation: none; } .tg-sweep.busy { opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .tg-sweep.busy, .tg-sweep.busy svg, .tg-sweep.cmu.busy svg { animation: none; } .tg-sweep.busy { opacity: .7; } }
 .tg-ibtn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--tg-sub); background: none; border: 0; cursor: pointer; }
 .tg-ibtn:active, .tg-ibtn:hover { background: var(--tg-hover); }
 .tg-ibtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -177,6 +183,7 @@ const ICON = {
   archive: ['M4 7h16v3H4z', 'M5 10v9h14v-9', 'M10 14h4'],
   back: ['M15 5l-7 7 7 7'],
   tick2: ['M2 13l4 4 8-9', 'M10 15l2 2 8-9'],
+  catchup: ['M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1-5.1-1.9 5.1-1.9z', 'M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z'],
   sweep: ['M20 4l-7.5 7.5', 'M10.5 10l3.5 3.5c-.8 3.4-3.2 6-6.5 7.5L3 20l1-4.5C5.5 12.2 7.6 10.4 10.5 10z', 'M7 15.5l2 2'],
 };
 function theme() {
@@ -306,11 +313,15 @@ export default {
         const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
         // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
         // Switch ready-sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
-        if (host.features?.['ready-sweep'] && host.sweep && folder === 'ready' && !query.trim() && rows.length) {
-          const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
+        // Switch catch-me-up (Miguel, 20 Nov 2026): the same pill reads Catch me up and covers every app, so it shows even
+        // when Ready is empty (Messenger, Tracker or Money may still wait on him).
+        const cmu = !!host.features?.['catch-me-up'];
+        if ((cmu || host.features?.['ready-sweep']) && host.sweep && folder === 'ready' && !query.trim() && (cmu || rows.length)) {
+          const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (cmu ? ' cmu' : '') + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
           sw.disabled = busy; sw.setAttribute('aria-busy', String(busy));
-          sw.title = busy ? 'Starting your sweep…' : `Work through all ${rows.length} Ready chats with your agent`;
-          sw.append(svg(host, ICON.sweep), busy ? 'Sweeping…' : 'Sweep'); top.append(sw);
+          sw.title = cmu ? (busy ? 'Gathering what waits on you…' : 'Everything waiting on you across your chats and apps')
+            : busy ? 'Starting your sweep…' : `Work through all ${rows.length} Ready chats with your agent`;
+          sw.append(svg(host, cmu ? ICON.catchup : ICON.sweep), cmu ? (busy ? 'Catching up…' : 'Catch me up') : busy ? 'Sweeping…' : 'Sweep'); top.append(sw);
         }
         if (c.archive) { const ab = host.element('button'); ab.type = 'button'; ab.className = 'tg-ibtn'; ab.dataset.tgArchive = ''; ab.title = 'Archived Chats'; ab.setAttribute('aria-label', 'Archived Chats'); ab.append(svg(host, ICON.archive)); top.append(ab); }
       }
