@@ -45,27 +45,25 @@ class CatchupTest(unittest.TestCase):
 
     def test_tools_listed(self):
         names = {t['name'] for t in self.srv.TOOLS}
-        self.assertTrue({'catchup_list', 'catchup_record'} <= names)
+        self.assertIn('catchup_list', names)
+        self.assertNotIn('catchup_record', names)   # fresh pull every time: nothing records for the next one
 
-    def test_first_then_second_links_previous_and_new_items(self):
+    def test_each_catchup_is_a_fresh_pull(self):
         a = self.srv.save_catchup({'chats': [{'id': 'c1', 'title': 'One'}], 'notifications': [{'id': 7, 'title': 'Bill'}]})
-        self.assertIsNone(a['previous'])
+        self.assertNotIn('previous', a)
         first = call(self.srv, 'catchup_list', {})['structuredContent']
-        self.assertIsNone(first['previous_catchup'])
-        self.assertIsNone(first['new_since_previous'])
-        rec = call(self.srv, 'catchup_record', {'catchup_id': a['catchup_id'], 'shown': [{'key': 'chat:c1', 'source': 'ready'}, 'mail:m1'],
-                                                 'decided': [{'key': 'chat:c1', 'decision': 'archive'}]})
-        self.assertFalse(rec['isError'])
-        call(self.srv, 'catchup_record', {'catchup_id': a['catchup_id'], 'shown': ['money:x'], 'append': True})
+        self.assertEqual([c['id'] for c in first['chats']], ['c1'])
+        self.assertEqual([n['id'] for n in first['notifications']], ['7'])
         import time; time.sleep(1.1)   # ids sort by the second they were made
-        b = self.srv.save_catchup({'chats': [{'id': 'c1'}, {'id': 'c2'}], 'notifications': [{'id': '7'}, {'id': '8'}]})
-        self.assertEqual(b['previous'], a['catchup_id'])
-        doc = call(self.srv, 'catchup_list', {'catchup_id': b['catchup_id']})['structuredContent']
-        self.assertEqual(doc['previous_catchup']['catchup_id'], a['catchup_id'])
-        self.assertEqual(doc['new_since_previous']['chats'], ['c2'])
-        self.assertEqual(doc['new_since_previous']['notifications'], ['8'])
-        self.assertEqual(doc['new_since_previous']['shown_keys_last_time'], ['chat:c1', 'mail:m1', 'money:x'])
-        self.assertEqual(doc['previous_catchup']['record']['decided'], [{'key': 'chat:c1', 'decision': 'archive'}])
+        b = self.srv.save_catchup({'chats': [{'id': 'c1'}, {'id': 'c2'}], 'notifications': [{'id': '8'}]})
+        self.assertEqual(set(b), {'catchup_id', 'chats', 'notifications'})
+        doc = call(self.srv, 'catchup_list', {})['structuredContent']
+        self.assertEqual(doc['catchup_id'], b['catchup_id'])
+        self.assertEqual(set(doc), {'catchup_id', 'created', 'chats', 'notifications'})
+        self.assertEqual([c['id'] for c in doc['chats']], ['c1', 'c2'])
+        self.assertEqual([n['id'] for n in doc['notifications']], ['8'])
+        old = call(self.srv, 'catchup_list', {'catchup_id': a['catchup_id']})['structuredContent']
+        self.assertEqual([c['id'] for c in old['chats']], ['c1'])
 
     def test_empty_ready_is_fine_and_bad_input_refused(self):
         self.assertEqual(self.srv.save_catchup({})['chats'], 0)
@@ -73,8 +71,9 @@ class CatchupTest(unittest.TestCase):
             self.srv.save_catchup({'chats': [{'title': 'no id'}]})
         bad = call(self.srv, 'catchup_list', {'catchup_id': '../etc/passwd'})
         self.assertTrue(bad['isError'])
-        bad = call(self.srv, 'catchup_record', {'catchup_id': 'cu_20260101_000000_abcdef'})
-        self.assertTrue(bad['isError'])
+        gone = self.srv.rpc({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
+                             'params': {'name': 'catchup_record', 'arguments': {'catchup_id': 'cu_20260101_000000_abcdef'}}})
+        self.assertTrue('error' in gone or gone.get('result', {}).get('isError'))   # the tool is gone
 
     def test_http_route_follows_switch(self):
         httpd = ThreadingHTTPServer(('127.0.0.1', 0), self.srv.Handler)

@@ -49,10 +49,13 @@ const CSS = `
 @keyframes tg-shimmer { to { background-position: -200% 0; } }
 @keyframes tg-broom { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
 @media (prefers-reduced-motion: reduce) { .tg-sweep.busy, .tg-sweep.busy svg { animation: none; } .tg-sweep.busy { opacity: .7; } }
-/* Catch me up (switch catch-me-up): the same pill with a sparkle that twinkles while the catch-up starts (Miguel, 20 Nov 2026). */
+/* Catch me up (switch catch-me-up): the same pill with a sparkle; while the catch-up chat runs the sparkle twinkles
+   and a small spinner turns next to the label (Miguel, 20 Nov 2026). */
 .tg-sweep.busy.tg-catchup svg { transform-origin: 50% 50%; animation: tg-twinkle .6s ease-in-out infinite alternate; }
+.tg-catchup .tg-spin { width: 14px; height: 14px; margin-left: 3px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tg-spin .8s linear infinite; }
 @keyframes tg-twinkle { from { transform: scale(.8) rotate(-12deg); opacity: .55; } to { transform: scale(1.12) rotate(12deg); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .tg-sweep.busy.tg-catchup svg { animation: none; } }
+@keyframes tg-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tg-sweep.busy.tg-catchup svg, .tg-catchup .tg-spin { animation: none; } }
 .tg-ibtn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--tg-sub); background: none; border: 0; cursor: pointer; }
 .tg-ibtn:active, .tg-ibtn:hover { background: var(--tg-hover); }
 .tg-ibtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -315,8 +318,10 @@ export default {
         if (host.features?.['catch-me-up'] && host.catchup && folder === 'ready' && !query.trim()) {
           const cu = host.element('button'), busy = !!host.catchupBusy?.(); cu.type = 'button'; cu.className = 'tg-sweep tg-catchup' + (busy ? ' busy' : ''); cu.dataset.tgCatchup = '';
           cu.disabled = busy; cu.setAttribute('aria-busy', String(busy));
-          cu.title = busy ? 'Starting your catch-up…' : 'Everything waiting on you across your apps, new since last time first';
-          cu.append(svg(host, ICON.sparkle), busy ? 'Catching up…' : 'Catch me up'); top.append(cu);
+          cu.title = busy ? 'Your catch-up is running; it lands in Ready when it is done' : 'Everything waiting on you across your apps, fresh each time';
+          cu.append(svg(host, ICON.sparkle), busy ? 'Catching up…' : 'Catch me up');
+          if (busy) { const sp = host.element('span'); sp.className = 'tg-spin'; sp.setAttribute('aria-hidden', 'true'); cu.append(sp); }
+          top.append(cu);
         } else if (host.features?.['ready-sweep'] && host.sweep && folder === 'ready' && !query.trim() && rows.length) {
           const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
           sw.disabled = busy; sw.setAttribute('aria-busy', String(busy));
