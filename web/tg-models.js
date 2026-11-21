@@ -58,10 +58,8 @@ function splitDots(t) { const v = t.startsWith('v'); const p = t.replace(/^v/, '
 
 const cmpVer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] ?? 0) - (b[i] ?? 0); if (d) return d; } return 0; };
 
-/* The menu's default rows: one per family in FAMILIES order, newest version, plain route before variants, preferred
- * provider on a tie. A family missing on the box is left out. The current route, when it is not one of those rows,
- * goes on top. Each row is the option plus label (the numbered name). */
-export function defaultRows(options, cur) {
+// Newest version per family in a list of routes: plain route before variants, preferred provider on a tie.
+function bestByFamily(options) {
   const best = new Map();
   for (const o of options || []) {
     const m = parseModel(o?.value); if (!m) continue;
@@ -72,15 +70,50 @@ export function defaultRows(options, cur) {
           : routeRank(m.family, o.provider) < routeRank(m.family, p.o.provider));
     if (better) best.set(m.family, { o, m });
   }
-  const rows = FAMILIES.filter(f => best.has(f)).map(f => ({ ...best.get(f).o, label: best.get(f).m.label }));
+  return best;
+}
+
+/* The menu's default rows: one per family in FAMILIES order, newest version, plain route before variants, preferred
+ * provider on a tie. A family missing on the box is left out. The current route, when it is newer than its family's
+ * row (a stale catalogue, telegram#40), is that family's row; otherwise, when it is not one of the rows, it goes on
+ * top. Each row is the option plus label (the numbered name). */
+export function defaultRows(options, cur) {
+  const best = bestByFamily(options);
+  let curRow = null;
   if (cur?.model) {
     const isCur = o => o.value === cur.model && (!cur.provider || o.provider === cur.provider);
-    if (!rows.some(isCur)) {
-      const o = (options || []).find(isCur) || { value: cur.model, provider: cur.provider || '', name: cur.model, description: '' };
-      rows.unshift({ ...o, label: numberedLabel(o.value) || o.name || o.value });
-    }
+    const sameRoute = (options || []).find(o => o.provider === cur.provider);
+    const o = (options || []).find(isCur) || { value: cur.model, provider: cur.provider || '', name: cur.model, description: sameRoute?.description || '' };
+    const m = parseModel(o.value), b = m && best.get(m.family);
+    if (m && !m.variant && (!b || b.m.variant || cmpVer(m.version, b.m.version) > 0)) best.set(m.family, { o, m });
+    else curRow = { o, isCur };
   }
+  const rows = FAMILIES.filter(f => best.has(f)).map(f => ({ ...best.get(f).o, label: best.get(f).m.label }));
+  if (curRow && !rows.some(curRow.isCur)) rows.unshift({ ...curRow.o, label: numberedLabel(curRow.o.value) || curRow.o.name || curRow.o.value });
   return rows;
+}
+
+/* Fresh catalogue (telegram#40). Hermes serves the model list from a per-provider disk cache, so a new version (Fable
+ * 5.2) can be missing from the menu while chats already run on it. `behind` names the models the box is known to run
+ * (the current route, recent chats) that are newer than their family's newest entry in the list. `refreshPlan` says
+ * whether to ask Hermes for a refreshed list now: at most once an hour, and once more for each new set of models the
+ * list is behind on. Returns the state to save, or null when the list is fresh enough. */
+export const REFRESH_MS = 60 * 60e3;
+export function behind(options, seen) {
+  const best = bestByFamily(options), out = new Set();
+  for (const r of seen || []) {
+    const m = parseModel(r?.model); if (!m || m.variant) continue;
+    const b = best.get(m.family);
+    if (!b || cmpVer(m.version, b.m.version) > 0) out.add(m.label);
+  }
+  return [...out].sort();
+}
+export function refreshPlan(options, seen, state, now) {
+  const sig = behind(options, seen).join(',');
+  const at = Number(state?.at) || 0;
+  if (!at || now - at >= REFRESH_MS || now < at) return { at: now, sig };
+  if (sig && sig !== (state?.sig || '')) return { at: now, sig };
+  return null;
 }
 
 // "Opus 5.5" for the header pill; '' when the id is not one we can number (the caller keeps its old label).

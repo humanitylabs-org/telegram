@@ -3,7 +3,7 @@
 // messages, tokens or model logic of its own.
 import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
-import { defaultRows as numberedRows, numberedLabel } from './tg-models.js';
+import { defaultRows as numberedRows, numberedLabel, refreshPlan } from './tg-models.js';
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 
@@ -793,6 +793,7 @@ function start() {
     let vis = M.visible(cur?.model || '', cur?.provider || '', keep);
     if (numbered()) { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
     modelList = all ? M.options : vis;
+    if (numbered()) freshenModels(M, all);
     const on = o => cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider);
     menu = document.createElement('div'); menu.className = 'tg-menu tg-models'; menu.setAttribute('role', 'menu');
     menu.innerHTML = `<b class="tg-models-h">${thread === '__new__' || isNote() ? 'Model for this new chat' : 'Model for this chat'}</b>`
@@ -802,6 +803,32 @@ function start() {
     const b = btn.getBoundingClientRect(), r = menu.getBoundingClientRect();
     menu.style.left = Math.max(8, Math.min(b.right - r.width, innerWidth - r.width - 8)) + 'px';
     menu.style.top = Math.max(8, Math.min(b.bottom + 6, innerHeight - r.height - 8)) + 'px';
+  }
+  // Stale catalogue (telegram#40): Hermes keeps each provider's model list in a disk cache, so a new version can be
+  // missing while chats already run on it. With numbered rows on, ask Hermes for a refreshed list at most once an hour,
+  // or sooner when this thread or a recent chat runs a newer version than the menu offers; repaint the open menu then.
+  let freshening = null;
+  function freshenModels(M, all) {
+    if (freshening) return;
+    const seen = [curRoute(), ...(LIVE.sessions || []).map(s => s?.model ? { model: s.model, provider: s.provider } : null)].filter(r => r?.model);
+    let state = null; try { state = JSON.parse(localStorage.getItem('tg.modelsFresh') || 'null'); } catch (_) {}
+    const plan = refreshPlan(M.options, seen, state, Date.now()); if (!plan) return;
+    try { localStorage.setItem('tg.modelsFresh', JSON.stringify(plan)); } catch (_) {}
+    const sig = () => JSON.stringify(M.options.map(o => [o.provider, o.value]));
+    const before = sig();
+    // The shell's own fetch, like WosModels.load, so the request goes where the catalogue comes from.
+    const get = typeof P?.fetch === 'function' ? P.fetch.bind(P) : fetch;
+    freshening = get('/wizard/hermes/api/model/options?refresh=true', { cache: 'no-store', credentials: 'same-origin' })
+      .then(r => { if (!r.ok) throw new Error(`Models not refreshed (${r.status})`); })
+      .then(() => Promise.resolve(M.loading).then(() => M.load(true)))
+      .then(() => {
+        if (sig() === before) return;
+        syncModelChip();
+        const b = root.querySelector('[data-tg-model]');
+        if (menu?.classList.contains('tg-models') && b) openModels(b, all);
+      })
+      .catch(e => console.warn(e))
+      .finally(() => { freshening = null; });
   }
   async function pickModel(o) {
     if (thread === '__new__' || isNote()) { newPick = { model: o.value, provider: o.provider }; syncModelChip(); return; }

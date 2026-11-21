@@ -1,7 +1,7 @@
 // node --test tests/tg-models.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseModel, defaultRows, numberedLabel } from '../web/tg-models.js';
+import { parseModel, defaultRows, numberedLabel, behind, refreshPlan, REFRESH_MS } from '../web/tg-models.js';
 
 const SUB = 'claude-subscription-directsdk-experimental';
 const O = (value, provider) => ({ value, provider, name: value, description: provider });
@@ -50,4 +50,46 @@ test('a missing family is left out; the current model on top when it is not one 
 
 test('a variant is used when it is the only route for its family', () => {
   assert.deepEqual(defaultRows([O('glm-5-3-flashx', 'nous')], null).map(r => [r.label, r.value]), [['GLM 5.3', 'glm-5-3-flashx']]);
+});
+
+// telegram#40: Hermes' cached anthropic list lacked claude-fable-5-2 while chats already ran on it.
+const STALE = [O('claude-fable-5.1', 'anthropic'), O('claude-fable-5', 'anthropic'), O('claude-opus-5-5', 'anthropic')];
+const FRESH = [O('claude-fable-5-2', 'anthropic'), ...STALE];
+
+test('a thread on a Fable newer than the stale list shows it as the checked Fable row', () => {
+  const cur = { model: 'claude-fable-5-2', provider: 'anthropic' };
+  const rows = defaultRows(STALE, cur);
+  assert.deepEqual(rows.map(r => [r.label, r.value, r.provider]), [['Opus 5.5', 'claude-opus-5-5', 'anthropic'], ['Fable 5.2', 'claude-fable-5-2', 'anthropic']]);
+  assert.equal(rows[1].description, 'anthropic');
+  assert.equal(numberedLabel(cur.model), 'Fable 5.2');
+  assert.deepEqual(defaultRows(FRESH, cur).map(r => [r.label, r.value]), [['Opus 5.5', 'claude-opus-5-5'], ['Fable 5.2', 'claude-fable-5-2']]);
+});
+
+test('a new chat gets Fable 5.2 once the refreshed list arrives', () => {
+  assert.deepEqual(defaultRows(STALE, null).map(r => r.label), ['Opus 5.5', 'Fable 5.1']);
+  assert.deepEqual(defaultRows(FRESH, null).map(r => [r.label, r.value]), [['Opus 5.5', 'claude-opus-5-5'], ['Fable 5.2', 'claude-fable-5-2']]);
+});
+
+test('a thread on an older Fable still offers the newest Fable row', () => {
+  const rows = defaultRows(FRESH, { model: 'claude-fable-5.1', provider: 'anthropic' });
+  assert.deepEqual(rows.map(r => [r.label, r.value]), [['Fable 5.1', 'claude-fable-5.1'], ['Opus 5.5', 'claude-opus-5-5'], ['Fable 5.2', 'claude-fable-5-2']]);
+});
+
+test('behind names models chats run that are newer than the list', () => {
+  const seen = [{ model: 'claude-fable-5-2', provider: 'anthropic' }, { model: 'claude-opus-5-5' }, { model: 'kimi-k3' }, { model: 'claude-fable-5-2' }];
+  assert.deepEqual(behind(STALE, seen), ['Fable 5.2']);
+  assert.deepEqual(behind(FRESH, seen), []);
+  assert.deepEqual(behind(STALE, [{ model: 'glm-5-3' }]), ['GLM 5.3']);
+  assert.deepEqual(behind(STALE, [{ model: 'claude-fable-6-0-fast' }]), []);
+});
+
+test('refresh at most once an hour, and once more for each new model the list is behind on', () => {
+  const now = 10 * REFRESH_MS, fable = [{ model: 'claude-fable-5-2' }];
+  assert.deepEqual(refreshPlan(STALE, [], null, now), { at: now, sig: '' });
+  assert.equal(refreshPlan(STALE, [], { at: now - 1000, sig: '' }, now), null);
+  assert.deepEqual(refreshPlan(STALE, [], { at: now - REFRESH_MS, sig: '' }, now), { at: now, sig: '' });
+  assert.deepEqual(refreshPlan(STALE, fable, { at: now - 1000, sig: '' }, now), { at: now, sig: 'Fable 5.2' });
+  assert.equal(refreshPlan(STALE, fable, { at: now - 1000, sig: 'Fable 5.2' }, now), null);
+  assert.equal(refreshPlan(FRESH, fable, { at: now - 1000, sig: '' }, now), null);
+  assert.deepEqual(refreshPlan(STALE, [], { at: now + 5000, sig: '' }, now), { at: now, sig: '' });
 });
