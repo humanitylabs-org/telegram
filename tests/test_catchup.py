@@ -40,14 +40,20 @@ class CatchupTest(unittest.TestCase):
         sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
         self.assertFalse(sw['catch-me-up']['on'])
         self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758'])
-        self.assertFalse(sw['numbered-models']['on'])
-        self.assertEqual(sw['numbered-models']['issues'], ['humanitylabs-org/telegram#13'])
 
     def test_newest_preview_is_always_on_and_its_switch_cleared(self):
         # telegram#1 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('newest-preview', {s['id'] for s in self.srv.switches_doc()['switches']})
         f = Path(self.tmp.name) / 'switches.json'
         f.write_text(json.dumps({'newest-preview': False, 'catch-me-up': True}))
+        self.srv.clear_retired_switches()
+        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+
+    def test_numbered_models_is_always_on_and_its_switch_cleared(self):
+        # telegram#13 approved: no switch any more, and an old stored value is dropped.
+        self.assertNotIn('numbered-models', {s['id'] for s in self.srv.switches_doc()['switches']})
+        f = Path(self.tmp.name) / 'switches.json'
+        f.write_text(json.dumps({'numbered-models': True, 'catch-me-up': True}))
         self.srv.clear_retired_switches()
         self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
 
