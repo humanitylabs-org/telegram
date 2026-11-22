@@ -43,6 +43,14 @@ class CatchupTest(unittest.TestCase):
         self.assertFalse(sw['numbered-models']['on'])
         self.assertEqual(sw['numbered-models']['issues'], ['humanitylabs-org/telegram#13'])
 
+    def test_newest_preview_is_always_on_and_its_switch_cleared(self):
+        # telegram#1 approved: no switch any more, and an old stored value is dropped.
+        self.assertNotIn('newest-preview', {s['id'] for s in self.srv.switches_doc()['switches']})
+        f = Path(self.tmp.name) / 'switches.json'
+        f.write_text(json.dumps({'newest-preview': False, 'catch-me-up': True}))
+        self.srv.clear_retired_switches()
+        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+
     def test_tools_listed(self):
         names = {t['name'] for t in self.srv.TOOLS}
         self.assertIn('catchup_list', names)
