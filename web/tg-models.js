@@ -1,4 +1,4 @@
-// Numbered model defaults (switch numbered-models, telegram#13). The model menu's default rows are exactly five
+// Numbered model defaults (telegram#13). The model menu's default rows are exactly five
 // families in this order: Opus, GLM, DeepSeek, Fable, Sol. Each row is the newest version this box offers, labelled
 // with its number ("Opus 5.5", "GLM 5.3", "DeepSeek V4.1"). Pure functions over WosModels.options so they can be
 // tested without the shell.

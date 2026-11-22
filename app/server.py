@@ -512,10 +512,6 @@ SWITCHES = [
                     'notifications routed to Chats count; Messenger reels, videos and links stay unread on a "to watch" line. '
                     'Catch-up replies always show in full.',
      'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758']},
-    {'id': 'numbered-models', 'name': 'Numbered model defaults',
-     'description': "The chat's model menu shows five rows, Opus, GLM, DeepSeek, Fable and Sol, each the newest version "
-                    'on this box with its number ("Opus 5.5"); the header pill shows the same numbered name. More models still lists them all.',
-     'default': False, 'issues': ['humanitylabs-org/telegram#13']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
@@ -682,7 +678,7 @@ wizard_switches_install(Handler)
 
 
 # Switches that were approved and removed (the feature is simply on now): their stored value is cleared.
-RETIRED_SWITCHES = ('newest-preview',)   # telegram#1
+RETIRED_SWITCHES = ('newest-preview', 'numbered-models')   # telegram#1, telegram#13
 
 
 def clear_retired_switches():

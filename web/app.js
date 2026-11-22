@@ -353,7 +353,6 @@ function start() {
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
     if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
-    if (f?.['numbered-models']) syncModelChip();
   }).catch(() => {});
   host.rowInfo = rowAsks;
   host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
@@ -764,8 +763,6 @@ function start() {
     const M = MODELS(); if (!M) return null;
     try { return thread === '__new__' || isNote() ? newPick || M.currentRoute('', null) : M.currentRoute(thread, null); } catch (_) { return null; }
   }
-  // Numbered model defaults (switch numbered-models, telegram#13): five numbered rows and a numbered header pill.
-  const numbered = () => host.features?.['numbered-models'] === true;
   // Same rule as the shell's own menu: a disconnected AI connector's models leave the list (a thread keeps its current one).
   function reachable(M, cur, keep) {
     const con = o => /^(claude-subscription-directsdk-experimental|anthropic)$/.test(o.provider) ? 'claude' : o.provider === 'openai-codex' ? 'chatgpt' : /wizard-tinfoil$/.test(o.provider || '') ? 'tinfoil' : '';
@@ -775,7 +772,7 @@ function start() {
     const M = MODELS(); if (!M) return '';
     if (modelBusy) return 'Saving…';
     const r = curRoute(); if (!r?.model) return 'Model';
-    return (numbered() && numberedLabel(r.model)) || M.short(r.model, r.provider) || r.model;
+    return numberedLabel(r.model) || M.short(r.model, r.provider) || r.model;
   }
   function modelChipHtml() { return MODELS() ? `<button type="button" class="tg-model" data-tg-model aria-haspopup="menu" title="Choose the model" aria-label="Model: ${esc(modelLabel())}"><span>${esc(modelLabel())}</span><i class="tg-chev" aria-hidden="true"></i></button>` : ''; }
   function syncModelChip() {
@@ -789,9 +786,10 @@ function start() {
     if (!M.ready && !M.options.length) return showErr(M.error || 'Could not load models');
     const cur = curRoute(), keep = thread !== '__new__' && !isNote();
     let vis = M.visible(cur?.model || '', cur?.provider || '', keep);
-    if (numbered()) { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
+    // Numbered model defaults (telegram#13): five numbered rows and a numbered header pill.
+    { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
     modelList = all ? M.options : vis;
-    if (numbered()) freshenModels(M, all);
+    freshenModels(M, all);
     const on = o => cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider);
     menu = document.createElement('div'); menu.className = 'tg-menu tg-models'; menu.setAttribute('role', 'menu');
     menu.innerHTML = `<b class="tg-models-h">${thread === '__new__' || isNote() ? 'Model for this new chat' : 'Model for this chat'}</b>`
@@ -803,7 +801,7 @@ function start() {
     menu.style.top = Math.max(8, Math.min(b.bottom + 6, innerHeight - r.height - 8)) + 'px';
   }
   // Stale catalogue (telegram#40): Hermes keeps each provider's model list in a disk cache, so a new version can be
-  // missing while chats already run on it. With numbered rows on, ask Hermes for a refreshed list at most once an hour,
+  // missing while chats already run on it. Ask Hermes for a refreshed list at most once an hour,
   // or sooner when this thread or a recent chat runs a newer version than the menu offers; repaint the open menu then.
   let freshening = null;
   function freshenModels(M, all) {
