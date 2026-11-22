@@ -281,21 +281,14 @@ export default {
       const time = host.element('time'); time.textContent = when(stamp(host, s)); l1.append(time);
       const l2 = host.element('span'); l2.className = 'tg-l2';
       const pv = host.element('span');
-      // Switch newest-preview (telegram#1): the newest reply's summary, never an older pinned ask; open asks below.
+      // One line only (Miguel, 22 Nov 2026): the newest message, no "Needs you:" label and no waiting chips.
       const info = host.rowInfo?.(s) || null;
       if (working) { const em = host.element('em'); em.textContent = 'typing…'; pv.append(em); }
-      else if (info) { if (info.needs) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st); } pv.append(info.preview || s.preview || ''); }
-      else if (needsYou(s) && s.attention?.ask) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st, s.attention.ask); }
-      else pv.textContent = esc(s.attention?.ask || s.preview || '');
+      else pv.append(info?.preview || s.preview || s.attention?.ask || '');
       l2.append(pv);
       // One rule: a badge means unread, and opening the chat clears it (its kind says why it matters).
       if (unread) { const x = host.element('i'); x.className = 'tg-badge ' + (failed(s) ? 'err' : needsYou(s) ? 'at' : 'dot'); x.textContent = failed(s) ? '!' : needsYou(s) ? '@' : ''; l2.append(x); }
       bd.append(l1, l2);
-      if (info?.chip) {
-        const ch = host.element('span'); ch.className = 'tg-askchip' + (info.chip.older ? ' older' : '');
-        ch.dataset.tgAskjump = s.id; ch.dataset.mid = info.chip.mid || ''; ch.title = 'Go to this message';
-        ch.textContent = info.chip.text; bd.append(ch);
-      }
       b.append(av, bd);
       return b;
     }

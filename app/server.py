@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'tg-style'
-VERSION = '0.8.35'
+VERSION = '0.8.36'
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml'}
 
 
@@ -497,8 +497,7 @@ from urllib.parse import urlsplit as _sw_urlsplit
 
 SWITCHES = [
     {'id': 'newest-preview', 'name': 'Newest reply in the chat list',
-     'description': "Each chat's preview line shows its newest reply's summary; asks still waiting on you get their own "
-                    'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
+     'description': "Each chat's preview line shows its newest reply's summary, nothing else.",
      'default': False, 'issues': ['humanitylabs-org/telegram#1']},
     {'id': 'ready-total', 'name': 'Ready shows its total',
      'description': "The Ready tab shows how many chats are in Ready, read or unread; the same number rides on the app's badge "
