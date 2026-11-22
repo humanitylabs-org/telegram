@@ -154,7 +154,6 @@ const CSS = `
 .tg-view.tg-view .ch-compose .ch-attach svg { stroke: var(--tg-sub); }
 `;
 
-const esc = s => String(s ?? '');
 function hash(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
 function initials(title) {
   const words = String(title || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
@@ -281,17 +280,15 @@ export default {
       const time = host.element('time'); time.textContent = when(stamp(host, s)); l1.append(time);
       const l2 = host.element('span'); l2.className = 'tg-l2';
       const pv = host.element('span');
-      // Switch newest-preview (telegram#1): the newest reply's summary, never an older pinned ask; open asks below.
-      const info = host.rowInfo?.(s) || null;
+      // The newest reply's summary, never an older pinned ask; open asks go in a chip below (telegram#1).
+      const info = host.rowInfo(s);
       if (working) { const em = host.element('em'); em.textContent = 'typing…'; pv.append(em); }
-      else if (info) { if (info.needs) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st); } pv.append(info.preview || s.preview || ''); }
-      else if (needsYou(s) && s.attention?.ask) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st, s.attention.ask); }
-      else pv.textContent = esc(s.attention?.ask || s.preview || '');
+      else { if (info.needs) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st); } pv.append(info.preview || s.preview || ''); }
       l2.append(pv);
       // One rule: a badge means unread, and opening the chat clears it (its kind says why it matters).
       if (unread) { const x = host.element('i'); x.className = 'tg-badge ' + (failed(s) ? 'err' : needsYou(s) ? 'at' : 'dot'); x.textContent = failed(s) ? '!' : needsYou(s) ? '@' : ''; l2.append(x); }
       bd.append(l1, l2);
-      if (info?.chip) {
+      if (info.chip) {
         const ch = host.element('span'); ch.className = 'tg-askchip' + (info.chip.older ? ' older' : '');
         ch.dataset.tgAskjump = s.id; ch.dataset.mid = info.chip.mid || ''; ch.title = 'Go to this message';
         ch.textContent = info.chip.text; bd.append(ch);
@@ -303,7 +300,7 @@ export default {
     function list() {
       const c = counts(), noteMode = folder === 'notes' && !inArchive && !query.trim();
       const rows = noteMode ? [] : pick(), nts = noteMode ? notes() : [];
-      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, !!host.sweepBusy?.(), !!host.catchupBusy?.(), nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), host.rowInfo ? JSON.stringify(host.rowInfo(s)) : '']), c]);
+      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, !!host.sweepBusy?.(), !!host.catchupBusy?.(), nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), JSON.stringify(host.rowInfo(s))]), c]);
       host.onCounts?.(c);
       if (next === sig && el.querySelector('.tg-list')) return;
       sig = next;
@@ -394,7 +391,7 @@ export default {
     host.listen('click', e => {
       // An open-ask chip sits inside its row: jump to that message instead of only opening the chat.
       const j = e.target.closest('[data-tg-askjump]');
-      if (j && host.jumpTo) { e.preventDefault(); e.stopImmediatePropagation(); host.jumpTo(j.dataset.tgAskjump, j.dataset.mid); return; }
+      if (j) { e.preventDefault(); e.stopImmediatePropagation(); host.jumpTo(j.dataset.tgAskjump, j.dataset.mid); return; }
       if (e.target.closest('[data-tg-catchup]')) { e.preventDefault(); e.stopImmediatePropagation(); host.catchup?.(pick()); return; }
       if (e.target.closest('[data-tg-sweep]')) { e.preventDefault(); e.stopImmediatePropagation(); host.sweep?.(pick()); return; }
       const f = e.target.closest('[data-tg-folder]');

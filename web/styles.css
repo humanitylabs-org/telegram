@@ -196,7 +196,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-models .tg-ck { font-style: normal; color: var(--tg-primary, #8774e1); }
 .tg-models .tg-models-more { color: var(--tg-primary, #8774e1); }
 
-/* Open-ask chip in the list (switch newest-preview): the message it points at flashes once when the chat opens. */
+/* Open-ask chip in the list (telegram#1): the message it points at flashes once when the chat opens. */
 .msg.tg-flash .bub { animation: tg-flash 1.6s ease-out 1; }
 @keyframes tg-flash { 0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tg-primary) 60%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }
 

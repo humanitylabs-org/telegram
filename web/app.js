@@ -323,7 +323,7 @@ function start() {
     } catch (e) { showErr(e.message || 'Could not start the catch-up'); }
     finally { catching = false; instance?.update?.(); }
   }
-  // Switch newest-preview (telegram#1, off by default): rows show the newest reply's summary plus an open-ask chip.
+  // Rows show the newest reply's summary plus an open-ask chip (telegram#1).
   // Each row's thread (and its tracker items, when the box keeps them) is read in the background, two at a time,
   // and again only when the list says the thread changed.
   const ASKS = new Map(), askQueue = []; let askBusy = 0, askPaint = 0;
@@ -354,11 +354,9 @@ function start() {
     host.features = f || {};
     if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
     if (f?.['numbered-models']) syncModelChip();
-    if (f?.['newest-preview'] !== true) return;
-    host.rowInfo = rowAsks;
-    host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
-    instance?.update?.();
   }).catch(() => {});
+  host.rowInfo = rowAsks;
+  host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
   instance = view.mount(listPane, host);
   const rowKey = r => r.dataset.chopen || (r.dataset.tgNote ? 'note:' + r.dataset.tgNote : '');
   const listRows = () => [...listPane.querySelectorAll('[data-chopen], [data-tg-note]')].filter(r => r.getClientRects().length);

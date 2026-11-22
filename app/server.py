@@ -496,10 +496,6 @@ from pathlib import Path as _SwPath
 from urllib.parse import urlsplit as _sw_urlsplit
 
 SWITCHES = [
-    {'id': 'newest-preview', 'name': 'Newest reply in the chat list',
-     'description': "Each chat's preview line shows its newest reply's summary; asks still waiting on you get their own "
-                    'small chip under it (tap it to jump to that message), which clears when a later reply settles it.',
-     'default': False, 'issues': ['humanitylabs-org/telegram#1']},
     {'id': 'ready-total', 'name': 'Ready shows its total',
      'description': "The Ready tab shows how many chats are in Ready, read or unread; the same number rides on the app's badge "
                     "in Wizard's app list while the app is open.",
@@ -685,6 +681,25 @@ def wizard_switches_install(handler_cls):
 wizard_switches_install(Handler)
 
 
+# Switches that were approved and removed (the feature is simply on now): their stored value is cleared.
+RETIRED_SWITCHES = ('newest-preview',)   # telegram#1
+
+
+def clear_retired_switches():
+    with _sw_lock:
+        saved = _sw_saved()
+        if not any(k in saved for k in RETIRED_SWITCHES):
+            return
+        f = _sw_file()
+        tmp = f.with_name(f.name + '.tmp')
+        tmp.write_text(json.dumps({k: v for k, v in saved.items() if k not in RETIRED_SWITCHES}))
+        os.replace(tmp, f)
+
+
 if __name__ == '__main__':
     connect().close()
+    try:
+        clear_retired_switches()
+    except OSError:
+        pass
     ThreadingHTTPServer((os.environ.get('BIND', '0.0.0.0'), int(os.environ.get('PORT', '8799'))), Handler).serve_forever()

@@ -1,4 +1,4 @@
-// Chat list preview with open asks (switch newest-preview, humanitylabs-org/telegram#1). Off by default.
+// Chat list preview with open asks (humanitylabs-org/telegram#1).
 // The row's preview line is the newest reply's own status ask (its one-line summary), so it matches what the
 // owner sees on opening the thread. Asks still waiting on the owner get their own chip under it, never in place
 // of it: from the thread tracker items when the box keeps them, else from the replies' own status lines.
