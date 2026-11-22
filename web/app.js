@@ -6,6 +6,7 @@ import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
 import { defaultRows as numberedRows, numberedLabel, refreshPlan } from './tg-models.js';
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
+import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -537,6 +538,23 @@ function start() {
     // check it is really on screen; if not, close it and show the photo in this window's own viewer.
     if (shown && !shellViewerVisible()) { try { KIT?.viewer?.close?.(); } catch (_) {} shown = false; }
     if (!shown) ownViewer(items, at);
+  });
+  // Copy and Share on a code block or a quote (wizard-ux issue 1671): the shell's Markdown draws them, this window
+  // runs them. Copy says Copied or Couldn't copy, never nothing.
+  listen('click', e => {
+    const t = copyTarget(e.target); if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    if (t.action === 'copy') {
+      void copyHere(t.text, { shell: KIT?.copyText }).then(ok => flash(t.button, ok ? 'Copied' : 'Couldn’t copy'));
+      return;
+    }
+    const mine = !!t.button.closest('.msg.u');
+    const share = mine ? KIT?.shareText : KIT?.shareAssistantText;
+    if (typeof share !== 'function') { void copyHere(t.text, { shell: KIT?.copyText }).then(ok => flash(t.button, ok ? 'Copied' : 'Couldn’t share')); return; }
+    Promise.resolve(share(t.text)).then(r => {
+      if (r === 'copied') flash(t.button, 'Copied');
+      else if (r === 'unsupported' || r === 'failed') flash(t.button, 'Couldn’t share');
+    }).catch(() => flash(t.button, 'Couldn’t share'));
   });
   listen('click', e => {
     const sa = e.target.closest('[data-tg-swipe-archive]'); if (!sa) return;
