@@ -93,3 +93,33 @@ test('refresh at most once an hour, and once more for each new model the list is
   assert.equal(refreshPlan(FRESH, fable, { at: now - 1000, sig: '' }, now), null);
   assert.deepEqual(refreshPlan(STALE, [], { at: now + 5000, sig: '' }, now), { at: now, sig: '' });
 });
+
+// telegram#40 (reopened): Hermes' built-in anthropic list stops at claude-fable-5.1 and a refresh does not change it,
+// while recent chats already run claude-fable-5-2 on the anthropic route.
+test('a recent chat on a newer plain version becomes its family row, on its own route', () => {
+  const seen = [{ model: 'claude-opus-5-5', provider: 'anthropic' }, { model: 'claude-fable-5-2', provider: 'anthropic' }, { model: 'kimi-k3', provider: 'anthropic' }];
+  const rows = defaultRows(STALE, null, seen);
+  assert.deepEqual(rows.map(r => [r.label, r.value, r.provider]), [['Opus 5.5', 'claude-opus-5-5', 'anthropic'], ['Fable 5.2', 'claude-fable-5-2', 'anthropic']]);
+  assert.equal(rows[1].description, 'anthropic');
+  // a thread on Fable 5.2: one Fable row, no extra row on top
+  assert.deepEqual(defaultRows(STALE, { model: 'claude-fable-5-2', provider: 'anthropic' }, seen).map(r => r.label), ['Opus 5.5', 'Fable 5.2']);
+  // a thread still on Fable 5.1 keeps its row on top and is offered Fable 5.2
+  assert.deepEqual(defaultRows(STALE, { model: 'claude-fable-5.1', provider: 'anthropic' }, seen).map(r => [r.label, r.value]),
+    [['Fable 5.1', 'claude-fable-5.1'], ['Opus 5.5', 'claude-opus-5-5'], ['Fable 5.2', 'claude-fable-5-2']]);
+  // no provider on the chat: the family row's route
+  assert.deepEqual(defaultRows(STALE, null, [{ model: 'claude-fable-5-2' }]).map(r => [r.value, r.provider]), [['claude-opus-5-5', 'anthropic'], ['claude-fable-5-2', 'anthropic']]);
+});
+
+test('recent chats never add a family, an unknown route, a variant or an older version', () => {
+  assert.deepEqual(defaultRows(STALE, null, [{ model: 'glm-5-3', provider: 'custom:wizard-tinfoil' }]).map(r => r.label), ['Opus 5.5', 'Fable 5.1']);
+  assert.deepEqual(defaultRows(STALE, null, [{ model: 'claude-fable-5-2', provider: 'openrouter' }]).map(r => r.label), ['Opus 5.5', 'Fable 5.1']);
+  assert.deepEqual(defaultRows(STALE, null, [{ model: 'claude-fable-5-2-fast', provider: 'anthropic' }]).map(r => r.label), ['Opus 5.5', 'Fable 5.1']);
+  assert.deepEqual(defaultRows(FRESH, null, [{ model: 'claude-fable-5', provider: 'anthropic' }]).map(r => [r.label, r.value]), [['Opus 5.5', 'claude-opus-5-5'], ['Fable 5.2', 'claude-fable-5-2']]);
+});
+
+test('of two recent routes for the same newer version, the preferred route wins', () => {
+  const opts = [...STALE, O('claude-fable-5-1', SUB)];
+  const seen = [{ model: 'claude-fable-5-2', provider: 'anthropic' }, { model: 'claude-fable-5-2', provider: SUB }];
+  assert.deepEqual(defaultRows(opts, null, seen).find(r => r.label === 'Fable 5.2').provider, SUB);
+  assert.deepEqual(defaultRows(opts, null, seen.slice().reverse()).find(r => r.label === 'Fable 5.2').provider, SUB);
+});
