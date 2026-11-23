@@ -7,6 +7,7 @@ import { defaultRows as numberedRows, numberedLabel, refreshPlan } from './tg-mo
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
+import { fuelHost } from './tg-fuel.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -353,8 +354,10 @@ function start() {
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
-    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
+    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up'] || f?.['fuel-gauge']) instance?.update?.();
   }).catch(() => {});
+  // Switch fuel-gauge (telegram#54): the shell's AI fuel gauge at the foot of the list (web/tg-fuel.js).
+  host.fuel = fuelHost(P, document);
   host.rowInfo = rowAsks;
   host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
   instance = view.mount(listPane, host);
