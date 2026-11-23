@@ -5,7 +5,7 @@ renamed_from: [telegram]
 name: TG style
 type: service
 category: app
-version: 0.8.40
+version: 0.8.41
 summary: Your Wizard chats with Telegram's look.
 license: GPL-3.0-only
 source: https://github.com/humanitylabs-org/telegram
