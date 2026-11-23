@@ -211,3 +211,19 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 .tg-note-route [data-notify-to="badge"] .wos-route-ic, .tg-note-route .wos-route-ic.wos-route-mr { fill: currentColor; stroke: none; }
 .tg-toast.tg-toast-info { background: var(--tg-head); color: var(--tg-text); }
 .tg-toast button { margin-left: 4px; border: 0; background: none; color: var(--tg-primary); font: inherit; font-weight: 600; cursor: pointer; }
+/* Reply to a message (telegram#44): the hold menu, the bar above the box, and the quote inside a sent bubble. */
+.tg-toast.ok { background: var(--tg-primary); }
+.msg.tg-held .bub { filter: brightness(.86); }
+@media (pointer: coarse) { .tg-view .ch-msgs .msg .bub { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
+.tg-rbar { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; background: var(--tg-compose); border-top: 1px solid var(--tg-line); cursor: pointer; }
+.tg-rbar-ic { flex: none; font-style: normal; color: var(--tg-primary); font-size: 1.25rem; line-height: 1; }
+.tg-rbar-q { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-left: 8px; border-left: 2px solid var(--tg-primary); font: .875rem/1.3 var(--tg-font); }
+.tg-rbar-q b { color: var(--tg-primary); font-weight: 600; }
+.tg-rbar-q span, .tg-rq span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tg-text); }
+.tg-rbar-x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--tg-sub); font-size: 1rem; cursor: pointer; }
+.tg-rbar-x:hover { background: var(--tg-hover); }
+.tg-rq { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-width: 0; max-width: 100%; margin: 0 0 4px; padding: 3px 8px; border: 0; border-left: 3px solid var(--tg-primary); border-radius: 6px; background: color-mix(in srgb, var(--tg-primary) 12%, transparent); color: inherit; text-align: left; font: .875rem/1.3 var(--tg-font); cursor: pointer; }
+.tg-rq b { color: var(--tg-primary); font-weight: 600; }
+.tg-rq.mine { border-left-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent); }
+.tg-rq.mine b, .tg-rq.mine span { color: inherit; }
+.tg-rq[disabled] { cursor: default; }
