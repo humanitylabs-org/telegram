@@ -76,9 +76,24 @@ function bestByFamily(options) {
 /* The menu's default rows: one per family in FAMILIES order, newest version, plain route before variants, preferred
  * provider on a tie. A family missing on the box is left out. The current route, when it is newer than its family's
  * row (a stale catalogue, telegram#40), is that family's row; otherwise, when it is not one of the rows, it goes on
- * top. Each row is the option plus label (the numbered name). */
-export function defaultRows(options, cur) {
+ * top. `seen` are routes recent chats run on: Hermes' built-in list can stop at an older version (Fable 5.1) while
+ * chats already run the newer one on the same route (claude-fable-5-2 on anthropic), so a recent chat's plain
+ * version newer than its family's row becomes that row, on its own route (or the row's route when it names none).
+ * Only for a family the list already offers and a route it already has, so a disconnected connector stays out.
+ * Each row is the option plus label (the numbered name). */
+export function defaultRows(options, cur, seen = []) {
   const best = bestByFamily(options);
+  for (const r of seen || []) {
+    const m = parseModel(r?.model), b = m && best.get(m.family);
+    if (!m || m.variant || !b) continue;
+    const provider = r.provider || b.o.provider || '';
+    const sameRoute = (options || []).find(o => o.provider === provider);
+    if (!sameRoute) continue;
+    const d = cmpVer(m.version, b.m.version);
+    if (!(b.m.variant ? d >= 0 : d > 0 || (d === 0 && b.seen && routeRank(m.family, provider) < routeRank(m.family, b.o.provider)))) continue;
+    const listed = (options || []).find(o => o.value === r.model && o.provider === provider);
+    best.set(m.family, { o: listed || { value: r.model, provider, name: r.model, description: sameRoute.description || '' }, m, seen: !listed });
+  }
   let curRow = null;
   if (cur?.model) {
     const isCur = o => o.value === cur.model && (!cur.provider || o.provider === cur.provider);
