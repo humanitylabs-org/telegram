@@ -2,7 +2,7 @@
 // approvals all go through the shell's own engine on the parent page (same origin), so this page keeps no
 // messages, tokens or model logic of its own.
 import view, { cleanTitle } from './tg-view.js';
-import { rowInfo as askRowInfo, chipText } from './tg-asks.js';
+import { rowInfo as askRowInfo } from './tg-asks.js';
 import { defaultRows as numberedRows, numberedLabel, refreshPlan } from './tg-models.js';
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
@@ -352,8 +352,7 @@ function start() {
     if (!e) { e = { key: '', info: null, busy: false }; ASKS.set(s.id, e); }
     if (e.key !== key && !e.busy && !WORKING.has(s.status)) { e.key = key; e.busy = true; askQueue.push(s.id); queueMicrotask(askPump); }
     const info = e.info || { preview: '', needs: false, asks: [] };
-    const a = info.asks[0];
-    return { preview: info.preview, needs: info.needs, chip: a ? { text: chipText(info.asks), mid: a.mid, older: !!a.older && info.asks.length === 1 } : null };
+    return { preview: info.preview };
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
