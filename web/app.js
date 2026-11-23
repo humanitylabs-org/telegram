@@ -8,6 +8,7 @@ import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
 import { fuelHost } from './tg-fuel.js';
+import { quoteOf, attach as attachQuote, split as splitQuote, findQuoted } from './tg-reply.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -50,7 +51,7 @@ function strip(s) {
 }
 function shape(m) {
   const raw = textOf(m.content);
-  if (m.role === 'user') return { ...m, text: strip(raw), files: filesIn(raw) };
+  if (m.role === 'user') { const q = splitQuote(raw); return { ...m, text: strip(q.text), files: filesIn(raw), quote: q.quote }; }
   let h = { text: raw, attachments: [] };
   try { if (KIT?.helm) h = KIT.helm(raw); } catch (_) {}
   const inline = new Set(Object.values(h.inlineMedia || {}));
@@ -242,6 +243,8 @@ function start() {
   // it is sent; a thread's pick is saved on the thread the same way Chats does it.
   let newPick = null, modelList = [], modelBusy = false;
   let jump = null; // { id, mid }: an open-ask chip's message to scroll to once its chat has loaded
+  // Reply to one message (telegram#44): thread -> the quote the next message in that chat carries.
+  const replies = new Map(); let menuMsg = null;
   // Wide window: chat list on the left, open chat (or none) on the right, like Telegram Desktop. Narrow: one at a time.
   root.innerHTML = '<div class="tg-pane-list"></div><div class="tg-pane-thread tg-view"></div>';
   const listPane = root.querySelector('.tg-pane-list'), threadPane = root.querySelector('.tg-pane-thread');
@@ -575,6 +578,9 @@ function start() {
     const nr = e.target.closest('.tg-note-route [data-notify-route]'); if (nr) { if (!nr.disabled) noteRoute(nr.dataset.notifyRoute, nr.dataset.notifyTo); return; }
     if (e.target.closest('[data-chnew]')) { open('__new__'); return; }
     if (e.target.closest('[data-tg-back]')) { close(); return; }
+    if (e.target.closest('[data-tg-rx]')) { cancelReply(); return; }
+    const rq = e.target.closest('[data-tg-rq]'); if (rq) { goToQuote(+rq.dataset.tgRq); return; }
+    if (e.target.closest('[data-tg-rbar]')) { focusComposer(); return; }
     const ab = e.target.closest('[data-tg-attach]'); if (ab) { openAttach(ab); return; }
     const x = e.target.closest('[data-tg-unattach]'); if (x) { tray = tray.filter(f => f.key !== x.dataset.tgUnattach); paintTray(); syncSend(); return; }
     const rs = e.target.closest('[data-tg-rsum]'); if (rs) { toggleSummary(rs.dataset.tgRsum); return; }
@@ -589,16 +595,21 @@ function start() {
     if (e.target.closest('[data-tg-title]') && thread && thread !== '__new__') renameBox(thread);
   });
   // Right-click on desktop, long-press on a phone: the chat's menu.
+  // The same on a message in an open chat: Reply and Copy, like Telegram (telegram#44).
   listen('contextmenu', e => {
+    const bub = msgAt(e.target);
+    if (bub) { e.preventDefault(); if (!menu) openMsgMenu(bub, e.clientX, e.clientY); return; }
     const row = e.target.closest('[data-chopen]'); if (!row) return;
     e.preventDefault(); if (menu) return; openMenu(row.dataset.chopen, e.clientX, e.clientY);
   });
   // iPhone Safari never fires contextmenu on a long press, so hold-to-open is timed here too.
   let press = null;
   listen('touchstart', e => {
-    const row = e.target.closest('[data-chopen]'); if (!row || e.touches.length !== 1) return;
+    if (e.touches.length !== 1) return;
+    const bub = msgAt(e.target), row = bub ? null : e.target.closest('[data-chopen]'); if (!bub && !row) return;
     const t = e.touches[0];
-    press = { x: t.clientX, y: t.clientY, timer: setTimeout(() => { press = { fired: true }; navigator.vibrate?.(10); openMenu(row.dataset.chopen, t.clientX, t.clientY); }, 520) };
+    const fire = () => { press = { fired: true }; if (menu) return; navigator.vibrate?.(10); if (bub) openMsgMenu(bub, t.clientX, t.clientY); else openMenu(row.dataset.chopen, t.clientX, t.clientY); };
+    press = { x: t.clientX, y: t.clientY, timer: setTimeout(fire, 520) };
   });
   listen('touchmove', e => { const t = e.touches[0]; if (press?.timer && Math.hypot(t.clientX - press.x, t.clientY - press.y) > 10) { clearTimeout(press.timer); press = null; } });
   listen('touchend', e => { if (press?.fired) e.preventDefault(); if (press?.timer) clearTimeout(press.timer); press = null; });
@@ -610,7 +621,7 @@ function start() {
     }
     if (e.target.matches?.('.ch-compose textarea') && e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(pointer: fine)').matches) { e.preventDefault(); send(); }
     if (e.target.matches?.('.tg-ap-answer') && e.key === 'Enter') { e.preventDefault(); choose('__answer'); }
-    if (e.key === 'Escape') { if (menu) closeMenu(); else if (thread && !e.target.matches?.('[data-tg-search]')) close(); }
+    if (e.key === 'Escape') { if (menu) closeMenu(); else if (thread && replies.has(thread) && e.target.matches?.('.ch-compose textarea')) cancelReply(); else if (thread && !e.target.matches?.('[data-tg-search]')) close(); }
   });
   // ⌥↓ / ⌥↑: next / previous chat in THIS list (Wizard's own meaning for those keys, applied to the list in front).
   // Window capture, registered before the shell hooks the frame on load, so the shell's sidebar step doesn't also fire.
@@ -718,7 +729,7 @@ function start() {
     try {
       const rows = await LIVE.messages(id);
       if (thread !== id) return;
-      msgs = rows.filter(m => m.role === 'user' || m.role === 'assistant').map(shape).filter(m => m.text || m.files.length);
+      msgs = rows.filter(m => m.role === 'user' || m.role === 'assistant').map(shape).filter(m => m.text || m.files.length || m.quote);
       const sig = msgs.length + ':' + (msgs.at(-1)?.id || '') + ':' + (LIVE.session(id)?.status || '') + ':' + (LIVE.session(id)?.title || '');
       if (sig !== msgSig) { msgSig = sig; paintThread(); try { if (LIVE.isNew?.(LIVE.session(id))) LIVE.markSeen(id); } catch (_) {} }
     } catch (e) { console.error(e); }
@@ -778,7 +789,65 @@ function start() {
     menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
     menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
   }
-  function closeMenu() { menu?.remove(); menu = null; }
+  function closeMenu() { menu?.remove(); menu = null; menuMsg = null; }
+  /* ---------- a message's menu: Reply, Copy (telegram#44) ---------- */
+  // The bubble a hold or right-click landed on: a real message of the open chat (not one still sending, not the live reply).
+  function msgAt(el) {
+    const node = el?.closest?.('.ch-msgs .msg[data-tg-mi]'); if (!node || node.classList.contains('pending') || isNote()) return null;
+    if (el.closest('a[href], audio, video, input, textarea, [data-tg-vnote], [data-codecopy], [data-codeshare], [data-quotecopy], [data-quoteshare]')) return null;
+    return node;
+  }
+  function openMsgMenu(node, x, y) {
+    closeMenu();
+    const m = msgs[+node.dataset.tgMi]; if (!m) return;
+    const canReply = !!quoteOf(m), text = copyable(m);
+    if (!canReply && !text) return;
+    menuMsg = m;
+    menu = document.createElement('div'); menu.className = 'tg-menu tg-msgmenu'; menu.setAttribute('role', 'menu');
+    menu.innerHTML = (canReply ? '<button type="button" role="menuitem" data-tg-menu="msg-reply">↩️ Reply</button>' : '')
+      + (text ? '<button type="button" role="menuitem" data-tg-menu="msg-copy">📋 Copy</button>' : '');
+    root.append(menu);
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+    node.classList.add('tg-held'); const done = () => node.classList.remove('tg-held');
+    const keep = menu; new MutationObserver((_, o) => { if (!keep.isConnected) { done(); o.disconnect(); } }).observe(root, { childList: true });
+  }
+  function copyable(m) { return ['🎤 Voice message', '📎'].includes(m.text) ? '' : String(m.text || '').trim(); }
+  function copyMsg(m) {
+    const text = copyable(m); if (!text) return;
+    void copyHere(text, { shell: KIT?.copyText }).then(ok => toastMsg(ok ? 'Copied' : 'Couldn’t copy', !ok));
+  }
+  function toastMsg(text, bad) {
+    let t = threadPane.querySelector('.tg-toast'); if (!t) { t = document.createElement('p'); t.setAttribute('role', 'status'); threadPane.append(t); }
+    t.className = 'tg-toast' + (bad ? '' : ' ok'); t.textContent = text; clearTimeout(t._h); t._h = setTimeout(() => t.remove(), 1800);
+  }
+  function replyTo(m) {
+    const q = quoteOf(m); if (!q || !thread) return;
+    replies.set(thread, q); paintReplyBar();
+    const ta = root.querySelector('.ch-compose textarea'); if (ta) ta.focus({ preventScroll: true });
+  }
+  function cancelReply() { if (thread) replies.delete(thread); paintReplyBar(); }
+  function whoName(role) { if (role === 'user') return 'You'; try { return P?.WizConfig?.agent?.() || 'Wizard'; } catch (_) { return 'Wizard'; } }
+  function replyBarHtml() {
+    const q = thread && replies.get(thread); if (!q) return '';
+    return `<div class="tg-rbar" data-tg-rbar><i class="tg-rbar-ic" aria-hidden="true">↩</i><div class="tg-rbar-q"><b>Reply to ${esc(whoName(q.role))}</b><span>${esc(q.excerpt)}</span></div><button type="button" class="tg-rbar-x" data-tg-rx aria-label="Cancel reply" title="Cancel reply">✕</button></div>`;
+  }
+  function paintReplyBar() {
+    const box = root.querySelector('.tg-composer'); if (!box) return;
+    box.querySelector('.tg-rbar')?.remove();
+    const html = replyBarHtml(); if (html) box.insertAdjacentHTML('afterbegin', html);
+  }
+  function quoteCardHtml(q, mine) {
+    if (!q) return '';
+    const i = findQuoted(msgs, q);
+    return `<button type="button" class="tg-rq${mine ? ' mine' : ''}" data-tg-rq="${i}"${i < 0 ? ' disabled' : ''} title="Go to the message"><b>${esc(whoName(q.role))}</b><span>${esc(q.excerpt)}</span></button>`;
+  }
+  function goToQuote(i) {
+    const target = root.querySelector(`.ch-msgs .msg[data-tg-mi="${i}"]`); if (!target) return;
+    const fold = target.closest('details'); if (fold) fold.open = true;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' }); target.classList.add('tg-flash'); setTimeout(() => target.classList.remove('tg-flash'), 1700);
+  }
   /* ---------- model picker ---------- */
   function curRoute() {
     const M = MODELS(); if (!M) return null;
@@ -881,6 +950,7 @@ function start() {
     input.click();
   }
   function menuAct(act, id) {
+    if (act === 'msg-reply' || act === 'msg-copy') { const m = menuMsg; closeMenu(); if (m) (act === 'msg-reply' ? replyTo(m) : copyMsg(m)); return; }
     if (PICK[act]) { closeMenu(); pick(act); return; }
     if (act === 'models-all') { const b = root.querySelector('[data-tg-model]'); if (b) openModels(b, true); return; }
     if (act === 'model') { const o = modelList[+id]; closeMenu(); if (o) pickModel(o); return; }
@@ -1015,13 +1085,16 @@ function start() {
       if (it) text = noteReply(it, text);
       thread = '__new__'; msgs = [];
     }
-    msgs.push({ id: 'pending', role: 'user', text, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
+    // A Reply (telegram#44): the message carries the quote; on screen it shows as a card above his words.
+    const quote = !isNote() && thread && thread !== '__new__' ? replies.get(thread) || null : null, words = text, replyAt = thread;
+    if (quote) { text = attachQuote(text, quote); replies.delete(thread); paintReplyBar(); }
+    msgs.push({ id: 'pending', role: 'user', text: words, quote, files: [], timestamp: Date.now() / 1000, pending: true }); paintThread();
     try {
       const opts = fileIds.length ? { fileIds } : {};
       if (thread === '__new__') { if (newPick) Object.assign(opts, newPick); const r = await LIVE.send(text, opts); newPick = null; thread = r.sessionId; root.querySelector('.ch-thread[data-tg-for="__new__"]')?.setAttribute('data-tg-for', thread); if (noteId) NOTES.done(noteId); }
       else await LIVE.reply(thread, text, opts);
       msgSig = ''; setTimeout(() => { load(); follow(); }, 700);
-    } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; paintThread(); throw e; }
+    } catch (e) { msgs = msgs.filter(m => m.id !== 'pending'); if (noteId) thread = prevThread; if (quote && !replies.has(replyAt)) replies.set(replyAt, quote); paintThread(); paintReplyBar(); throw e; }
     finally { sending = false; }
   }
   function noteReply(it, text) {
@@ -1032,6 +1105,7 @@ function start() {
   // chat when it began in New chat or on a notification), and the chat now on screen stays as it is (Miguel, 20 Nov 2026).
   async function deliverAway(text, fileIds, target) {
     const opts = fileIds.length ? { fileIds } : {};
+    const quote = replies.get(target); if (quote) { text = attachQuote(text, quote); replies.delete(target); }
     let noteId = '';
     if (String(target).startsWith('note:')) {
       const it = NOTES.item(target.slice(5)); noteId = it?.id || '';
@@ -1065,9 +1139,9 @@ function start() {
   /* ---------- painting ---------- */
   const ICON_BTN = '<svg viewBox="0 0 24 24" class="i-send"><path d="M4 12l16-8-6 16-2-7z"/></svg><svg viewBox="0 0 24 24" class="i-mic"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   function composerHtml(busy) {
-    if (rec) return `<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
+    if (rec) return `${replyBarHtml()}<div class="tg-tray" hidden></div><div class="ch-compose tg-recbar"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><button type="button" class="tg-rec-x" data-tg-rec-cancel aria-label="Cancel">✕</button><span class="tg-rec-dot"></span><span class="tg-rec-time">0:00</span><span class="tg-rec-hint">Recording…</span><button type="button" class="tg-sendbtn" data-mode="send" data-tg-rec-send aria-label="Send voice message">${ICON_BTN}</button></div><input type="file" id="tg-file" multiple hidden>`;
     if (busy) return `<div class="ch-compose tg-recbar"><em class="tg-spin"></em><span class="tg-rec-hint">Sending voice message…</span></div>`;
-    return `<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-micbtn" data-tg-mic aria-label="Record a voice message to send with the attachments" title="Voice note with the attachments" hidden><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
+    return `${replyBarHtml()}<div class="tg-tray" hidden></div><form class="ch-compose"><button type="button" class="ch-attach" data-tg-attach aria-label="Attach" title="Attach a photo or file"><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3"/></svg></button><textarea rows="1" placeholder="Message" aria-label="Message">${esc(draft)}</textarea><button type="button" class="tg-micbtn" data-tg-mic aria-label="Record a voice message to send with the attachments" title="Voice note with the attachments" hidden><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path class="ln" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="button" class="tg-sendbtn" data-mode="mic" data-tg-mic aria-label="Record a voice message">${ICON_BTN}</button></form><input type="file" id="tg-file" multiple hidden>`;
   }
   function paintComposer(busy = false) {
     const box = root.querySelector('.tg-composer'); if (!box) return;
@@ -1138,7 +1212,7 @@ function start() {
       const shown = !text ? '' : !lead ? `<div class="tg-text">${text}</div>`
         : `<button type="button" class="tg-rsum" data-tg-rsum="${rk}" aria-expanded="false"${open ? ' hidden' : ''}><span>${esc(/[.!?…"'”’»]$/u.test(lead) ? lead : lead + '.')}</span><i class="tg-chev" aria-hidden="true"></i></button>`
           + `<div class="tg-rdet"${open ? '' : ' hidden'}><div class="tg-text">${text}</div><button type="button" class="tg-rless" data-tg-rsum="${rk}" aria-expanded="true">Show less<i class="tg-chev up" aria-hidden="true"></i></button></div>`;
-      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}${lead ? ' has-rsum' : ''}" data-tg-mid="${esc(String(m.id ?? ''))}"><div class="bub">${files}${shown}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
+      body += `<div class="msg ${u ? 'u' : 'a'}${m.pending ? ' pending' : ''}${lead ? ' has-rsum' : ''}${m.quote ? ' has-rq' : ''}" data-tg-mid="${esc(String(m.id ?? ''))}" data-tg-mi="${i}"><div class="bub">${quoteCardHtml(m.quote, u)}${files}${shown}<span class="mmeta"><time>${esc(clock(m.timestamp))}</time></span></div></div>`;
       if (foldOpen && !folded.has(i + 1)) { body += '</details>'; foldOpen = false; }
     }
     body += liveHtml();
