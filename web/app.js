@@ -9,6 +9,7 @@ import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
 import { fuelHost } from './tg-fuel.js';
 import { quoteOf, attach as attachQuote, split as splitQuote, findQuoted } from './tg-reply.js';
+import { failLine, failHtml, openFix } from './tg-fail.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -577,6 +578,7 @@ function start() {
     const nr = e.target.closest('.tg-note-route [data-notify-route]'); if (nr) { if (!nr.disabled) noteRoute(nr.dataset.notifyRoute, nr.dataset.notifyTo); return; }
     if (e.target.closest('[data-chnew]')) { open('__new__'); return; }
     if (e.target.closest('[data-tg-back]')) { close(); return; }
+    const fx = e.target.closest('[data-tg-reconnect]'); if (fx) { openFix(P, fx.dataset.tgReconnect, fx.dataset.tgFixPath, fx.dataset.tgFixRun); return; }
     if (e.target.closest('[data-tg-rx]')) { cancelReply(); return; }
     const rq = e.target.closest('[data-tg-rq]'); if (rq) { goToQuote(+rq.dataset.tgRq); return; }
     if (e.target.closest('[data-tg-rbar]')) { focusComposer(); return; }
@@ -662,6 +664,9 @@ function start() {
   listen('drop', e => { root.classList.remove('tg-drop'); if (thread && e.dataTransfer?.files?.length) { e.preventDefault(); addFiles([...e.dataTransfer.files]); } });
 
   LIVE.onChange(() => { if (thread && thread !== '__new__') { load(); follow(); checkApproval(); } });
+  // A subscription signed out or back in (the shell's WosUsage reading): the failed chat's line switches between
+  // Reconnect and the plain reason at once (telegram#53).
+  if (P) { const onSignin = () => { if (thread && thread !== '__new__' && !isNote()) paintThread(); }; try { P.addEventListener('wos:ai-signin', onSignin); addEventListener('pagehide', () => { try { P.removeEventListener('wos:ai-signin', onSignin); } catch (_) {} }); } catch (_) {} }
   setInterval(() => { const s = thread && thread !== '__new__' && LIVE.session(thread); if (s && (WORKING.has(s.status) || s.status === 'waiting_for_approval')) { load(); follow(); checkApproval(); } }, 3000);
 
   /* ---------- thread lifecycle ---------- */
@@ -1215,6 +1220,8 @@ function start() {
       if (foldOpen && !folded.has(i + 1)) { body += '</details>'; foldOpen = false; }
     }
     body += liveHtml();
+    // Why a failed or interrupted send didn't go, in one line; a signed-out subscription gets its Reconnect (telegram#53).
+    if (body && s) body += failHtml(failLine(s, MODELS(), P?.WosErrors));
     if (!body) body = thread === '__new__' ? '<div class="tg-day"><span>New chat with your Wizard</span></div>' : '<div class="tg-day"><span>Loading…</span></div>';
     const working = s && WORKING.has(s.status);
     const status = working ? 'typing…' : s?.status === 'waiting_for_approval' ? 'waiting for you' : 'online';
