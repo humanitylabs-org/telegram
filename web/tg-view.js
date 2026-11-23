@@ -96,9 +96,6 @@ const CSS = `
 .tg-badge { flex: none; min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; background: var(--tg-green); }
 .tg-badge.dot { min-width: 12px; width: 12px; height: 12px; padding: 0; margin: 0 5px; }
 .tg-badge.at { background: var(--tg-primary); }
-.tg-askchip { align-self: flex-start; max-width: 100%; box-sizing: border-box; padding: 2px 9px; border-radius: 10px; font-size: .8125rem; color: var(--tg-primary); background: color-mix(in srgb, var(--tg-primary) 14%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.tg-askchip:hover { background: color-mix(in srgb, var(--tg-primary) 22%, transparent); }
-.tg-askchip.older { color: var(--tg-sub); background: color-mix(in srgb, var(--tg-sub) 12%, transparent); }
 .tg-badge.err { background: var(--tg-danger); }
 .tg-row.unread .tg-l1 b { font-weight: 700; }
 .tg-note-av { background: color-mix(in srgb, #f5b82e 30%, transparent); }
@@ -294,19 +291,14 @@ export default {
       const time = host.element('time'); time.textContent = when(stamp(host, s)); l1.append(time);
       const l2 = host.element('span'); l2.className = 'tg-l2';
       const pv = host.element('span');
-      // The newest reply's summary, never an older pinned ask; open asks go in a chip below (telegram#1).
+      // One line, like Telegram (telegram#46): the newest reply's summary, no "Needs you:" label and no waiting chips.
       const info = host.rowInfo(s);
       if (working) { const em = host.element('em'); em.textContent = 'typing…'; pv.append(em); }
-      else { if (info.needs) { const st = host.element('strong'); st.textContent = 'Needs you: '; pv.append(st); } pv.append(info.preview || s.preview || ''); }
+      else pv.append(info.preview || s.preview || '');
       l2.append(pv);
       // One rule: a badge means unread, and opening the chat clears it (its kind says why it matters).
       if (unread) { const x = host.element('i'); x.className = 'tg-badge ' + (failed(s) ? 'err' : needsYou(s) ? 'at' : 'dot'); x.textContent = failed(s) ? '!' : needsYou(s) ? '@' : ''; l2.append(x); }
       bd.append(l1, l2);
-      if (info.chip) {
-        const ch = host.element('span'); ch.className = 'tg-askchip' + (info.chip.older ? ' older' : '');
-        ch.dataset.tgAskjump = s.id; ch.dataset.mid = info.chip.mid || ''; ch.title = 'Go to this message';
-        ch.textContent = info.chip.text; bd.append(ch);
-      }
       b.append(av, bd);
       return b;
     }
@@ -408,9 +400,6 @@ export default {
     };
 
     host.listen('click', e => {
-      // An open-ask chip sits inside its row: jump to that message instead of only opening the chat.
-      const j = e.target.closest('[data-tg-askjump]');
-      if (j) { e.preventDefault(); e.stopImmediatePropagation(); host.jumpTo(j.dataset.tgAskjump, j.dataset.mid); return; }
       if (e.target.closest('[data-tg-catchup]')) { e.preventDefault(); e.stopImmediatePropagation(); host.catchup?.(pick()); return; }
       if (e.target.closest('[data-tg-sweep]')) { e.preventDefault(); e.stopImmediatePropagation(); host.sweep?.(pick()); return; }
       const f = e.target.closest('[data-tg-folder]');
