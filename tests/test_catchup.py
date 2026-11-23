@@ -41,6 +41,11 @@ class CatchupTest(unittest.TestCase):
         self.assertFalse(sw['catch-me-up']['on'])
         self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758'])
 
+    def test_fuel_gauge_switch_listed_off_with_issue(self):
+        sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
+        self.assertFalse(sw['fuel-gauge']['on'])
+        self.assertEqual(sw['fuel-gauge']['issues'], ['humanitylabs-org/telegram#54'])
+
     def test_newest_preview_is_always_on_and_its_switch_cleared(self):
         # telegram#1 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('newest-preview', {s['id'] for s in self.srv.switches_doc()['switches']})
