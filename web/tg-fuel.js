@@ -1,4 +1,4 @@
-// Switch fuel-gauge (telegram#54): the AI apps sidebar's fuel gauge (E ▮▮▮ F) at the foot of the chat list.
+// telegram#54: the AI apps sidebar's fuel gauge (E ▮▮▮ F) at the foot of the chat list.
 // Nothing is redrawn here. The shell's own component paints it: wizard-ux web/layouts/ai-apps/parts.js gaugeInto,
 // fuelOf and fuelEl, loaded from the shell (same origin), read from the shell's AI usage feed (WosResources, kept
 // polling while the gauge is on screen) with the default model's provider, exactly as the desktop sidebar foot does.

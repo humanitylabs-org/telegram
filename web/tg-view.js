@@ -105,7 +105,7 @@ const CSS = `
   background: var(--tg-primary); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; z-index: 2; }
 .tg-fab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tg-wrap { position: relative; height: 100%; min-height: 0; }
-/* Switch fuel-gauge: the AI apps sidebar foot's gauge (wizard-ux desktop.css .aad-fuel, the .mh-gauge E/cells/F
+/* telegram#54: the AI apps sidebar foot's gauge (wizard-ux desktop.css .aad-fuel, the .mh-gauge E/cells/F
    markup), pinned bottom left and clear of the pencil (56 px + 18 px margin), vertically centred on it. */
 .tg-fuel { position: absolute; left: 12px; right: 86px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: flex-start; pointer-events: none; z-index: 2; }
 .tg-fuel[hidden] { display: none; }
@@ -368,9 +368,9 @@ export default {
       const fab = host.element('button'); fab.type = 'button'; fab.className = 'tg-fab'; fab.dataset.chnew = ''; fab.setAttribute('aria-label', 'New chat'); fab.dataset.wzKey = 'n'; fab.title = 'New chat (⌥N)'; fab.append(svg(host, ICON.pencil));
       // The pencil always shows, on phone and desktop (Miguel, 18 Nov 2026); a folded narrow list hides it via CSS.
       wrap.append(root, fab);
-      // Switch fuel-gauge (telegram#54): the AI apps sidebar's fuel gauge at the foot of the list, clear of the pencil;
+      // The AI apps sidebar's fuel gauge at the foot of the list, clear of the pencil (telegram#54);
       // the shell's own component paints it (web/tg-fuel.js) and a tap opens the same AI usage page.
-      const fuel = host.features?.['fuel-gauge'] && host.fuel ? host.element('div') : null;
+      const fuel = host.fuel ? host.element('div') : null;
       if (fuel) { fuel.className = 'tg-fuel'; fuel.dataset.fuelCopy = ''; fuel.hidden = true; wrap.append(fuel); }
       const keep = el.querySelector('.tg-scroll')?.scrollTop || 0;
       el.replaceChildren(wrap);
