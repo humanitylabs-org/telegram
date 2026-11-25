@@ -1,7 +1,7 @@
 // node --test tests/tg-models.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseModel, defaultRows, numberedLabel, behind, refreshPlan, REFRESH_MS } from '../web/tg-models.js';
+import { parseModel, defaultRows, numberedLabel, behind, refreshPlan, REFRESH_MS, remember, remembered, KNOWN_MS } from '../web/tg-models.js';
 
 const SUB = 'claude-subscription-directsdk-experimental';
 const O = (value, provider) => ({ value, provider, name: value, description: provider });
@@ -122,4 +122,25 @@ test('of two recent routes for the same newer version, the preferred route wins'
   const seen = [{ model: 'claude-fable-5-2', provider: 'anthropic' }, { model: 'claude-fable-5-2', provider: SUB }];
   assert.deepEqual(defaultRows(opts, null, seen).find(r => r.label === 'Fable 5.2').provider, SUB);
   assert.deepEqual(defaultRows(opts, null, seen.slice().reverse()).find(r => r.label === 'Fable 5.2').provider, SUB);
+});
+
+test('a list that falls back to the built-in catalogue never pulls the Fable row back to 5.1', () => {
+  const t0 = 1_000_000_000_000;
+  const known = remember(FRESH, null, t0);
+  assert.equal(known.fable.model, 'claude-fable-5-2');
+  const later = remember(STALE, known, t0 + 60e3);
+  assert.equal(later.fable.model, 'claude-fable-5-2');
+  assert.equal(later.fable.at, t0);
+  assert.deepEqual(defaultRows(STALE, null, remembered(later)).map(r => [r.label, r.value, r.provider]),
+    [['Opus 5.5', 'claude-opus-5-5', 'anthropic'], ['Fable 5.2', 'claude-fable-5-2', 'anthropic']]);
+  assert.deepEqual(defaultRows(STALE, { model: 'claude-opus-5-5', provider: 'anthropic' }, remembered(later)).map(r => r.label), ['Opus 5.5', 'Fable 5.2']);
+});
+
+test('a remembered route expires when no real list has offered it for two weeks', () => {
+  const t0 = 1_000_000_000_000;
+  const known = remember(FRESH, null, t0);
+  assert.equal(remember(STALE, known, t0 + KNOWN_MS - 1).fable.model, 'claude-fable-5-2');
+  assert.equal(remember(STALE, known, t0 + KNOWN_MS + 1).fable.model, 'claude-fable-5.1');
+  assert.equal(remember(FRESH, known, t0 + KNOWN_MS - 1).fable.at, t0 + KNOWN_MS - 1);
+  assert.deepEqual(remember(FRESH, 'junk', t0).fable.model, 'claude-fable-5-2');
 });
