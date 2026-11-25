@@ -131,5 +131,26 @@ export function refreshPlan(options, seen, state, now) {
   return null;
 }
 
+/* Remembered newest routes (telegram#40, third report). When Hermes cannot reach a provider's live model list (an
+ * expired token refresh, a slow or overloaded API) it answers with its built-in list for a minute or more, and that
+ * list stops at Fable 5.1, so the Fable row fell back to 5.1 whenever the list was fetched in that gap. `remember`
+ * keeps the newest plain route per family from every list the menu sees and never lets a shorter list downgrade it;
+ * `remembered` hands them to defaultRows as `seen` routes (same guards: family and route must still be offered).
+ * An entry not seen in a real list for KNOWN_MS is dropped, so a model the box really lost goes away. */
+export const KNOWN_MS = 14 * 24 * 60 * 60e3;
+export function remember(options, state, now) {
+  const out = {};
+  for (const [f, e] of Object.entries(state && typeof state === 'object' ? state : {}))
+    if (e?.model && Number(e.at) > now - KNOWN_MS && Number(e.at) <= now) out[f] = { model: String(e.model), provider: String(e.provider || ''), at: Number(e.at) };
+  for (const [f, { o, m }] of bestByFamily(options)) {
+    if (m.variant) continue;
+    const k = out[f], km = k && parseModel(k.model);
+    if (!km || cmpVer(m.version, km.version) > 0) out[f] = { model: o.value, provider: o.provider || '', at: now };
+    else if (!cmpVer(m.version, km.version) && o.value === k.model) out[f] = { ...k, provider: o.provider || k.provider, at: now };
+  }
+  return out;
+}
+export function remembered(state) { return Object.values(state || {}).filter(e => e?.model).map(e => ({ model: e.model, provider: e.provider || '' })); }
+
 // "Opus 5.5" for the header pill; '' when the id is not one we can number (the caller keeps its old label).
 export function numberedLabel(model) { return parseModel(model)?.label || ''; }

@@ -3,7 +3,7 @@
 // messages, tokens or model logic of its own.
 import view, { cleanTitle } from './tg-view.js';
 import { rowInfo as askRowInfo } from './tg-asks.js';
-import { defaultRows as numberedRows, numberedLabel, refreshPlan } from './tg-models.js';
+import { defaultRows as numberedRows, numberedLabel, refreshPlan, remember, remembered } from './tg-models.js';
 import { catchupRunning, catchupMessage, isCatchupChat } from './tg-catchup.js';
 import { routeHtml as noteRouteHtml, pickRoute } from './tg-noteroute.js';
 import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
@@ -881,7 +881,7 @@ function start() {
     const cur = curRoute(), keep = thread !== '__new__' && !isNote();
     let vis = M.visible(cur?.model || '', cur?.provider || '', keep);
     // Numbered model defaults (telegram#13): five numbered rows and a numbered header pill.
-    { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null, recentRoutes()); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
+    { const rows = numberedRows(reachable(M, cur, keep), cur?.model ? cur : null, [...recentRoutes(), ...knownRoutes(M)]); if (rows.length) vis = rows.map(o => ({ ...o, name: o.label || o.name })); }
     modelList = all ? M.options : vis;
     freshenModels(M, all);
     const on = o => cur && o.value === cur.model && (!cur.provider || o.provider === cur.provider);
@@ -900,6 +900,14 @@ function start() {
   let freshening = null;
   // Routes the box's own chats run on (not a private agent's), newest first: the numbered rows take a newer version from
   // them when Hermes' built-in list is behind (telegram#40: Fable 5.2 runs on anthropic while the list stops at 5.1).
+  // The newest route per family from every list this device has seen (telegram#40): a list fetched while Hermes falls
+  // back to its built-in catalogue never pulls the Fable row back to 5.1.
+  function knownRoutes(M) {
+    let state = null; try { state = JSON.parse(localStorage.getItem('tg.modelsKnown') || 'null'); } catch (_) {}
+    const next = remember(M.options, state, Date.now());
+    try { localStorage.setItem('tg.modelsKnown', JSON.stringify(next)); } catch (_) {}
+    return remembered(next);
+  }
   function recentRoutes() {
     return (LIVE.sessions || []).filter(s => s?.model && !s.hidden && !LIVE.agentOf?.(s.id)).map(s => ({ model: s.model, provider: s.provider || '' }));
   }
