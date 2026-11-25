@@ -357,9 +357,9 @@ function start() {
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
-    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up'] || f?.['fuel-gauge']) instance?.update?.();
+    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
   }).catch(() => {});
-  // Switch fuel-gauge (telegram#54): the shell's AI fuel gauge at the foot of the list (web/tg-fuel.js).
+  // The shell's AI fuel gauge at the foot of the list (telegram#54, web/tg-fuel.js).
   host.fuel = fuelHost(P, document);
   host.rowInfo = rowAsks;
   host.jumpTo = (id, mid) => { jump = mid ? { id, mid } : null; open(id); };
