@@ -34,50 +34,9 @@ With switch `catch-me-up` on, the Ready folder's Sweep button becomes Catch me u
 1. Call this app's `catchup_list` with the id from the first message (directly, no tool search). It returns `chats` (Ready) and `notifications` (unread). Leave out other "Catch me up" and "Ready sweep" chats.
    Its `notifications` are the only notifications in the catch-up: just the ones his Settings > Notifications routing sends to Chats (the rest go to badges, the Morning Report or off on purpose). Never read the Notifications app's own inbox or tools, and never report its unread count (wizard-os#758: the raw inbox showed about 69 while his Chats had 3).
 2. Gather the rest from each app's own MCP tools (`mcp__wizard__<app>__*`), only for apps that are installed; skip a missing one silently. Look for: Messenger replies waiting and drafts to send (`messenger_list_drafts`), Tracker items that name him or wait on him, Money (bills, payments or transactions to look at), Mail (unread mail that needs an answer), Second Hand (listings, offers, messages), Card Benefits (offers or credits about to expire). Read Ready chats as the Ready sweep's steps 2 to 4 say before describing one. Never describe something you have not read.
-3. Write it in two steps (Miguel, 20 Nov 2026, wizard-os#758). He reads it top to bottom on his phone and answers by
-   voice as he goes, so keep it condensed, accurate and answerable in order. No tables, no A/B/C/D chunks, no
-   headings: the only structure is bold app names and numbered lines. This overrides any persona default in this chat.
-   Keep everything as short as possible.
-4. Step one, one Clear all list up front, covering every app: Wizard chats, notifications, Messenger, Mail, WizardOS
-   Tracker, Card Benefits, Money, Second Hand (only installed apps that have something). It holds only things that need
-   nothing from him: finished or FYI chats to archive, notifications to clear, Messenger chats to mark read, obvious
-   quick approvals. Messenger "mark read" is only for plain chatter and promos, never just because nothing needs a reply:
-   reels, videos and links people sent him (Instagram reels, YouTube links) are things he watches later in batches. Give
-   them their own `to watch` line under **Messenger** (who sent it and how many, e.g. "Messenger · to watch: Pari 4
-   reels, Jan 1 link"), keep them unread, and never mark those chats read, also not on "clear". Group under bold app names, number continuously across apps, one short line each saying what it
-   is. Bulk items are one count line ("Mail · 34 unread, nothing for you", "Messenger · 6 chats to mark read"). Mail is
-   low signal: almost always one mark-all-read line; list a single mail only when it truly needs his help (then it
-   belongs in step two). End with: Reply `clear` or `clear except 7`.
-
-   ```
-   **Clear all**
-
-   **Wizard chats**
-   1. Telegram chat: Catch me up is live and installed.
-   2. Weather check: done, nothing to do.
-
-   **Notifications**
-   3. 4 build notifications, all finished.
-
-   **Messenger**
-   4. Messenger · 6 chats to mark read (chatter and promos)
-   Messenger · to watch: Pari 4 reels, Jan 1 link (left unread)
-
-   **Mail**
-   5. Mail · 34 unread, nothing for you
-
-   Reply `clear` or `clear except 4`.
-   ```
-
-5. Step two, the Needs-you items, one app at a time in batches of about 3 to 5: Wizard chats and notifications
-   together first, then Messenger, Tracker, Card Benefits, Money, Mail, Second Hand. Each item is one numbered line: a
-   bold short name, two short sentences of real context read from the source (who it is, what was said or decided,
-   and what is blocking it; never invented or over-summarised), then a yes/no-style question with your pick in
-   italics, e.g. `3. **Visa:** The agent filled Pari's DS-160 and the embassy offers 4 Dec. Only you can pick B1/B2
-   and pay the 5,920 THB fee. Remind you tonight? *remind*`.
-   Messenger needs-you items are drafts to send (send/skip) and replies you can't write alone. Every Ready chat that
-   needs him gets its own line: never fold chats together. He answers like "1 to 4 yes, 5 later". Show the first
-   batch right after he answers step one (or with step one when it is empty).
-6. Act only on his answer, through the owning app, then say in one short line what you did and show the next batch.
-   End with "all clear" or the short list of what is still waiting (the "later" ones).
-7. Never send, archive, pay, reply or retry anything he has not said yes to. "Clear" covers only the step-one list. The `to watch` line is not part of "clear": those chats stay unread.
+3. Write it one app per message (Miguel, 20 Nov 2026). He reads on his phone and answers by voice, so keep each message short, accurate and answerable in order. No tables, no headings beyond the bold header line, no A/B/C chunks. This overrides any persona default in this chat. Order: Messenger, Mail, WizardOS Tracker, Card Benefits, Money/Finances, Second Hand, Wizard chats and notifications last (skip any app with nothing; count only the apps that remain).
+4. Every app message starts with a progress line: `**2 of 5 · Mail** · Still to do: Tracker, Card Benefits, Second Hand` (the last one says `· Last one`). End every back-and-forth reply inside an app with the same line, so he never loses his place. Show only the first app message at the start; show the next one only after he finishes the current app.
+5. Messenger is one message and you never mark any Messenger chat read, not even on "clear" or "done". Before writing it, save a draft (messenger_create_draft, in the chat's language; bilingual English + Thai for Thai contacts) for every chat that needs a reply from him: read each thread first, never draft for promos, group chatter or reels. Then list only the names you drafted for, plus anything you could not draft (e.g. needs photos from him), and one action line: `→ [Open Messenger](/messenger/), then send, edit or skip each draft. Reply done when you're back.`
+6. Every other item is a numbered line: bold short name, one or two short sentences of real context read from the source (never invented), then one action line starting with →: a relative link to the exact place to act or test when there is one (e.g. [Open Music](/wizard-music/)), then the exact reply words in code, numbered with the item, e.g. `→ [Open Music](/wizard-music/) and play one song to the end. Reply 1 fixed or 1 broken.` or `→ Reply 2 remind and I'll remind you on Jan 5.` One primary action per item; no vague "try it / later" italics. Low-signal bulk (e.g. Mail newsletters) is one FYI sentence at the top of that app, not items. He can answer several at once ("1 fixed, 3 chase").
+7. Act only on his answer, through the owning app, say in one short line what you did, then show the next app. Finish with `**All clear** · Left for later:` and the skipped or "later" items (or nothing).
+8. Never send, archive, pay, reply, approve or retry anything he has not said yes to. Drafts are saved, never sent.

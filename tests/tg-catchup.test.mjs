@@ -27,20 +27,31 @@ test('message is a fresh pull, no earlier-catch-up logic', () => {
   assert.match(m.instructions, /catchup_list/);
   assert.match(m.instructions, /3 Ready chat\(s\) and 2 unread/);
   assert.doesNotMatch(m.instructions, /catchup_record|previous/);
-  assert.match(m.instructions, /two-step layout/);
-  assert.match(m.instructions, /Clear all/);
-  assert.match(m.instructions, /No tables, no A\/B\/C\/D chunks/);
+  assert.match(m.instructions, /one app per message/);
+  assert.doesNotMatch(m.instructions, /two-step|Clear all|clear except/);
+  assert.match(m.instructions, /No tables, no A\/B\/C chunks/);
   assert.doesNotMatch(m.instructions, /app table|### A/);
 });
 
-test('follow-ups (wizard-os#758): routed notifications only, Messenger to watch, two sentences of context', () => {
+test('follow-ups (wizard-os#758): routed notifications only, real context', () => {
   const m = catchupMessage({ catchup_id: 'cu_20261120_000000_abcdef', chats: 1, notifications: 3 });
   assert.match(m.instructions, /only notifications to cover \(what his routing sends to Chats\)/);
   assert.match(m.instructions, /never read the Notifications app's own inbox or report its unread count/);
-  assert.match(m.instructions, /reels, videos and links/);
-  assert.match(m.instructions, /"to watch" line \(who sent it, how many\) and stay unread/);
-  assert.match(m.instructions, /two short sentences read from the source: who, what was said or decided, what is blocking it/);
-  assert.doesNotMatch(m.instructions, /one sentence read from the source/);
+  assert.match(m.instructions, /one or two short sentences of real context read from the source/);
+});
+
+test('one app per message (wizard-os#795): order, progress line, Messenger drafts, action lines', () => {
+  const m = catchupMessage({ catchup_id: 'cu_20261120_000000_abcdef', chats: 1, notifications: 3 });
+  assert.match(m.instructions, /order Messenger, Mail, WizardOS Tracker, Card Benefits, Money\/Finances, Second Hand, Wizard chats and notifications last/);
+  assert.match(m.instructions, /\*\*2 of 5 · Mail\*\* · Still to do: .*· Last one/);
+  assert.match(m.instructions, /every back-and-forth reply inside an app ends with the same line/);
+  assert.match(m.instructions, /Show only the first app now/);
+  assert.match(m.instructions, /messenger_create_draft/);
+  assert.match(m.instructions, /→ \[Open Messenger\]\(\/messenger\/\), then send, edit or skip each draft\. Reply done when you're back\./);
+  assert.match(m.instructions, /Never mark any Messenger chat read, not even on "clear" or "done"/);
+  assert.match(m.instructions, /one action line starting with →/);
+  assert.match(m.instructions, /\*\*All clear\*\* · Left for later:/);
+  assert.doesNotMatch(m.instructions, /"to watch"|your pick in italics|batches of 3 to 5/);
 });
 
 test('catch-up chat is told by its first message (wizard-os#758)', () => {
