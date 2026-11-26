@@ -39,7 +39,7 @@ class CatchupTest(unittest.TestCase):
     def test_switch_listed_off_with_issue(self):
         sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
         self.assertFalse(sw['catch-me-up']['on'])
-        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758'])
+        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758', 'humanitylabs-org/wizard-os#795'])
 
     def test_fuel_gauge_is_always_on_and_its_switch_cleared(self):
         # telegram#54 approved: no switch any more, and an old stored value is dropped.
@@ -83,10 +83,23 @@ class CatchupTest(unittest.TestCase):
     def test_skill_has_the_followups(self):
         skill = (Path(__file__).resolve().parent.parent / 'skill' / 'SKILL.md').read_text()
         self.assertIn('never report its unread count', skill)
-        self.assertIn('`to watch` line', skill)
-        self.assertIn('keep them unread', skill)
-        self.assertIn('two short sentences of real context', skill)
         self.assertNotIn('one sentence of real context', skill)
+
+    def test_skill_is_one_app_per_message(self):
+        # wizard-os#795 (Miguel, 20 Nov 2026): one app per message with a progress line, Messenger drafts, action lines.
+        skill = (Path(__file__).resolve().parent.parent / 'skill' / 'SKILL.md').read_text()
+        cu = skill[skill.index('## Catch me up'):]
+        self.assertIn('3. Write it one app per message (Miguel, 20 Nov 2026).', cu)
+        self.assertIn('Order: Messenger, Mail, WizardOS Tracker, Card Benefits, Money/Finances, Second Hand, Wizard chats and notifications last', cu)
+        self.assertIn('`**2 of 5 · Mail** · Still to do: Tracker, Card Benefits, Second Hand` (the last one says `· Last one`)', cu)
+        self.assertIn('you never mark any Messenger chat read, not even on "clear" or "done"', cu)
+        self.assertIn('messenger_create_draft', cu)
+        self.assertIn('`→ [Open Messenger](/messenger/), then send, edit or skip each draft. Reply done when you\'re back.`', cu)
+        self.assertIn('`→ [Open Music](/wizard-music/) and play one song to the end. Reply 1 fixed or 1 broken.`', cu)
+        self.assertIn('Finish with `**All clear** · Left for later:`', cu)
+        self.assertIn('8. Never send, archive, pay, reply, approve or retry anything he has not said yes to. Drafts are saved, never sent.', cu)
+        for gone in ('Clear all', 'two steps', 'Step one', '`to watch` line', 'with your pick in\n   italics', 'batches of about 3 to 5'):
+            self.assertNotIn(gone, cu)
 
     def test_each_catchup_is_a_fresh_pull(self):
         a = self.srv.save_catchup({'chats': [{'id': 'c1', 'title': 'One'}], 'notifications': [{'id': 7, 'title': 'Bill'}]})

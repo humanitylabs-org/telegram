@@ -506,12 +506,12 @@ SWITCHES = [
      'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'catch-me-up', 'name': 'Catch me up',
      'description': 'In the Ready folder, Sweep becomes Catch me up: one tap starts a catch-up chat in the background (the button spins '
-                    'while it runs). When it is done it lands in Ready with everything waiting on you across your '
-                    'apps in two steps: first one numbered Clear all list you answer with "clear" (or "clear except 7"), then the items '
-                    'that need you, a few at a time per app, each with two short sentences of context and a yes/no question. Only '
-                    'notifications routed to Chats count; Messenger reels, videos and links stay unread on a "to watch" line. '
-                    'Catch-up replies always show in full.',
-     'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758']},
+                    'while it runs). When it is done it lands in Ready and walks you through your apps one message per app '
+                    '(Messenger, Mail, Tracker, Card Benefits, Money, Second Hand, Wizard chats last), each starting with a '
+                    'progress line like "2 of 5 · Mail · Still to do: ...". Messenger drafts are saved for every chat that needs '
+                    'a reply and no Messenger chat is marked read; every other item has one action line with a link and the exact '
+                    'reply words. Only notifications routed to Chats count. Catch-up replies always show in full.',
+     'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758', 'humanitylabs-org/wizard-os#795']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')

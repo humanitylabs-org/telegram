@@ -23,11 +23,17 @@ export function catchupMessage(cu) {
       + `it has ${n} Ready chat(s) and ${a} unread notification(s). Those are the only notifications to cover (what his routing sends to Chats): `
       + `never read the Notifications app's own inbox or report its unread count. Then check the owner's other installed apps as the skill says. `
       + `This is a fresh pull: say nothing about earlier catch-ups. `
-      + `Write it in the skill's two-step layout: first one numbered Clear all list for every app (bold app names, one short line each, `
-      + `he replies "clear" or "clear except 7"); in Messenger only plain chatter and promos are marked read, and reels, videos and links `
-      + `people sent him go on their own "to watch" line (who sent it, how many) and stay unread. Then the Needs-you items one app at a time `
-      + `in batches of 3 to 5 (bold short name, two short sentences read from the source: who, what was said or decided, what is blocking it; `
-      + `then a yes/no question with your pick in italics). No tables, no A/B/C/D chunks, no headings.`,
+      + `Write it one app per message as the skill says (Miguel, 20 Nov 2026): order Messenger, Mail, WizardOS Tracker, Card Benefits, `
+      + `Money/Finances, Second Hand, Wizard chats and notifications last; skip apps with nothing and count only the rest. `
+      + `Every app message starts with a progress line like **2 of 5 · Mail** · Still to do: Tracker, Second Hand (the last one says · Last one), `
+      + `and every back-and-forth reply inside an app ends with the same line. Show only the first app now; the next one only after he finishes it. `
+      + `Messenger is one message: first save a draft (messenger_create_draft, in the chat's language) for every chat that needs a reply from him, `
+      + `then list the names you drafted for and one line: → [Open Messenger](/messenger/), then send, edit or skip each draft. Reply done when you're back. `
+      + `Never mark any Messenger chat read, not even on "clear" or "done". `
+      + `Every other item is a numbered line: bold short name, one or two short sentences of real context read from the source, then one action line `
+      + `starting with → (a relative link to the exact place to act or test when there is one, then the exact reply words in code, numbered with the item, `
+      + `e.g. Reply 1 fixed or 1 broken). No vague italic options. Finish with **All clear** · Left for later:. `
+      + `No tables, no A/B/C chunks, no headings beyond the bold header line. Never send, archive, pay, reply, approve or retry anything he has not said yes to.`,
   };
 }
 
