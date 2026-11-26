@@ -41,6 +41,12 @@ class CatchupTest(unittest.TestCase):
         self.assertFalse(sw['catch-me-up']['on'])
         self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758', 'humanitylabs-org/wizard-os#795'])
 
+    def test_app_popups_switch_listed_off_with_issue(self):
+        # wizard-os#796: app links in a chat open as a pop-up over TG style, off by default.
+        sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
+        self.assertFalse(sw['app-popups']['on'])
+        self.assertEqual(sw['app-popups']['issues'], ['humanitylabs-org/wizard-os#796'])
+
     def test_fuel_gauge_is_always_on_and_its_switch_cleared(self):
         # telegram#54 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('fuel-gauge', {s['id'] for s in self.srv.switches_doc()['switches']})
