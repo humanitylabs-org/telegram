@@ -10,6 +10,7 @@ import { copyTarget, copyText as copyHere, flash } from './tg-copy.js';
 import { fuelHost } from './tg-fuel.js';
 import { quoteOf, attach as attachQuote, split as splitQuote, findQuoted } from './tg-reply.js';
 import { failLine, failHtml, openFix } from './tg-fail.js';
+import { popupHref, openPopup } from './tg-popup.js';
 
 const root = document.getElementById('tg-root');
 const P = (() => { try { return window.parent !== window && window.parent.WizLive ? window.parent : null; } catch (_) { return null; } })();
@@ -545,6 +546,17 @@ function start() {
     if (shown && !shellViewerVisible()) { try { KIT?.viewer?.close?.(); } catch (_) {} shown = false; }
     if (!shown) ownViewer(items, at);
   });
+  // A link to another Wizard app in a chat opens as a pop-up over this window (wizard-os#796, switch app-popups), so
+  // the thread and its scroll stay where they were. Window capture: it runs before the shell's own frame link guard,
+  // which would send the link to that app's own window or desk. Not taken (switch off, an older shell, any other
+  // link): the tap goes on exactly as before.
+  addEventListener('click', e => {
+    if (host.features?.['app-popups'] !== true || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target?.closest?.('a[href]'); if (!a || !root.contains(a)) return;
+    let shell = null; try { shell = window.parent !== window ? window.parent : null; } catch (_) { shell = null; }
+    if (!openPopup(shell, popupHref(a, location.href))) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
   // Copy and Share on a code block or a quote (wizard-ux issue 1671): the shell's Markdown draws them, this window
   // runs them. Copy says Copied or Couldn't copy, never nothing.
   listen('click', e => {

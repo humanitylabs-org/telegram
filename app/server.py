@@ -512,6 +512,11 @@ SWITCHES = [
                     'a reply and no Messenger chat is marked read; every other item has one action line with a link and the exact '
                     'reply words. Only notifications routed to Chats count. Catch-up replies always show in full.',
      'default': False, 'issues': ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758', 'humanitylabs-org/wizard-os#795']},
+    {'id': 'app-popups', 'name': 'App links open on top',
+     'description': 'In a chat (a Catch me up overview above all), tapping a link to another Wizard app such as /messenger/ '
+                    'or /wizard-music/ opens that app as a pop-up on top of TG style instead of leaving the chat. Close it '
+                    '(X, swipe down, Back or Esc) and you are back in the same chat at the same spot.',
+     'default': False, 'issues': ['humanitylabs-org/wizard-os#796']},
 ]
 _SW_CONTRACT = 'wizard.app-switches/1'
 _SW_ROUTE = _sw_re.compile(r'(?:/[a-z0-9][a-z0-9-]{0,62})?/api/switches/?')
