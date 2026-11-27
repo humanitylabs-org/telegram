@@ -1,7 +1,7 @@
 ---
 name: tg-style
 description: Use when the owner asks about the Telegram look for his chats.
-version: 0.8.47
+version: 0.8.48
 author: Oscar (Hermes Agent)
 license: GPL-3.0-only
 platforms: [linux, macos]
