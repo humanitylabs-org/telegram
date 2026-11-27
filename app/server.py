@@ -496,14 +496,6 @@ from pathlib import Path as _SwPath
 from urllib.parse import urlsplit as _sw_urlsplit
 
 SWITCHES = [
-    {'id': 'ready-total', 'name': 'Ready shows its total',
-     'description': "The Ready tab shows how many chats are in Ready, read or unread; the same number rides on the app's badge "
-                    "in Wizard's app list while the app is open.",
-     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
-    {'id': 'ready-sweep', 'name': 'Sweep button',
-     'description': 'A Sweep button in the Ready folder opens a new chat where your agent walks you through every Ready chat '
-                    'in sensible chunks, so you can archive, answer or keep them in bulk.',
-     'default': False, 'issues': ['humanitylabs-org/telegram#5']},
     {'id': 'catch-me-up', 'name': 'Catch me up',
      'description': 'In the Ready folder, Sweep becomes Catch me up: one tap starts a catch-up chat in the background (the button spins '
                     'while it runs). When it is done it lands in Ready and walks you through your apps one message per app '
@@ -683,7 +675,7 @@ wizard_switches_install(Handler)
 
 
 # Switches that were approved and removed (the feature is simply on now): their stored value is cleared.
-RETIRED_SWITCHES = ('newest-preview', 'numbered-models', 'fuel-gauge')   # telegram#1, telegram#13, telegram#54
+RETIRED_SWITCHES = ('newest-preview', 'numbered-models', 'fuel-gauge', 'ready-total', 'ready-sweep')   # telegram#1, #13, #54, #5, #5
 
 
 def clear_retired_switches():

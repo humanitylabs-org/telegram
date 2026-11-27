@@ -278,16 +278,16 @@ function start() {
     // device's Chats routing. Tap = mark read there, then open it the way Chats does (or the item's app).
     notes: NOTES,
     features: {},
-    // Ready sweep (switch ready-sweep): save the Ready list the owner sees, then open a new chat that works through it.
+    // Ready sweep: save the Ready list the owner sees, then open a new chat that works through it.
     sweep: rows => startSweep(rows),
     sweepBusy: () => sweeping,
     // Catch me up (switch catch-me-up): save Ready chats + unread notifications, then start a chat that covers every app
     // in the background. The pill spins while that chat runs; it lands in Ready when the overview is done.
     catchup: rows => startCatchup(rows),
     catchupBusy: () => catching || catchupRunning(lastCatchup(), lastCatchupSession()),
-    // Switch ready-total: the Ready total also rides on this app's badge in Wizard's app list. The badge is a while-open
+    // The Ready total also rides on this app's badge in Wizard's app list. The badge is a while-open
     // extra (the shell clears it when the window closes or reloads), so the Ready tab is the source of truth.
-    onCounts: c => { if (!host.features?.['ready-total']) return; const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
+    onCounts: c => { const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
   let sweeping = false, lastBadge = -1;
   // One tap = one sweep: taps while it starts are ignored, and a tap within 2 minutes of the last sweep reopens it.
@@ -358,7 +358,7 @@ function start() {
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
-    if (f?.['ready-total'] || f?.['ready-sweep'] || f?.['catch-me-up']) instance?.update?.();
+    if (f?.['catch-me-up']) instance?.update?.();
   }).catch(() => {});
   // The shell's AI fuel gauge at the foot of the list (telegram#54, web/tg-fuel.js).
   host.fuel = fuelHost(P, document);
