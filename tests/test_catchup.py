@@ -71,6 +71,16 @@ class CatchupTest(unittest.TestCase):
         self.srv.clear_retired_switches()
         self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
 
+    def test_ready_total_and_sweep_are_always_on_and_their_switches_cleared(self):
+        # telegram#5 approved: no switches any more, and old stored values are dropped.
+        ids = {s['id'] for s in self.srv.switches_doc()['switches']}
+        self.assertNotIn('ready-total', ids)
+        self.assertNotIn('ready-sweep', ids)
+        f = Path(self.tmp.name) / 'switches.json'
+        f.write_text(json.dumps({'ready-total': False, 'ready-sweep': True, 'catch-me-up': True}))
+        self.srv.clear_retired_switches()
+        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+
     def test_tools_listed(self):
         names = {t['name'] for t in self.srv.TOOLS}
         self.assertIn('catchup_list', names)

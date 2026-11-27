@@ -250,9 +250,8 @@ export default {
     }
     function counts() {
       const live = visible().filter(s => !archived(host, s));
-      // Switch ready-total: Ready's number is every chat in it, read or not (Miguel, 19 Nov 2026).
-      const total = !!host.features?.['ready-total'];
-      return { ready: live.filter(s => !isWorking(s) && (total || host.isUnread(s))).length, working: live.filter(isWorking).length,
+      // Ready's number is every chat in it, read or not (Miguel, 19 Nov 2026).
+      return { ready: live.filter(s => !isWorking(s)).length, working: live.filter(isWorking).length,
         notes: noteCount(host), archive: visible().length - live.length };
     }
     function notes() {
@@ -319,7 +318,7 @@ export default {
       } else {
         const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
         // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
-        // Switch ready-sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
+        // Sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
         // Switch catch-me-up: Sweep becomes Catch me up, shown even when Ready is empty (other apps may still wait on him).
         if (host.features?.['catch-me-up'] && host.catchup && folder === 'ready' && !query.trim()) {
           const cu = host.element('button'), busy = !!host.catchupBusy?.(); cu.type = 'button'; cu.className = 'tg-sweep tg-catchup' + (busy ? ' busy' : ''); cu.dataset.tgCatchup = '';
@@ -328,7 +327,7 @@ export default {
           cu.append(svg(host, ICON.sparkle), busy ? 'Catching up…' : 'Catch me up');
           if (busy) { const sp = host.element('span'); sp.className = 'tg-spin'; sp.setAttribute('aria-hidden', 'true'); cu.append(sp); }
           top.append(cu);
-        } else if (host.features?.['ready-sweep'] && host.sweep && folder === 'ready' && !query.trim() && rows.length) {
+        } else if (host.sweep && folder === 'ready' && !query.trim() && rows.length) {
           const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
           sw.disabled = busy; sw.setAttribute('aria-busy', String(busy));
           sw.title = busy ? 'Starting your sweep…' : `Work through all ${rows.length} Ready chats with your agent`;
@@ -345,7 +344,7 @@ export default {
         for (const [id, label] of FOLDERS) {
           const t = host.element('button'); t.type = 'button'; t.className = 'tg-tab'; t.dataset.tgFolder = id; t.setAttribute('role', 'tab');
           t.setAttribute('aria-selected', String(folder === id)); const lb = host.element('span'); lb.textContent = label; t.append(lb);
-          // Switch ready-total: the Ready tab shows its total, every chat in it read or not (Miguel, 20 Nov 2026); the same
+          // The Ready tab shows its total, every chat in it read or not (Miguel, 20 Nov 2026); the same
           // number also rides on the app's badge while the app is open.
           const n = id === 'ready' ? c.ready : id === 'working' ? c.working : id === 'notes' ? c.notes : 0;
           if (n) { const i = host.element('i'); i.textContent = String(n); t.append(i); }
