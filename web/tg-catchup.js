@@ -1,4 +1,4 @@
-// Catch me up (switch catch-me-up, telegram#7). A tap starts a fresh catch-up chat in the background (the owner stays
+// Catch me up (telegram#7, on for everyone). A tap starts a fresh catch-up chat in the background (the owner stays
 // in the list); the pill keeps its spinner while that chat is running and a second tap never starts another run.
 // The chat lands in Ready on its own once the overview is done. Pure functions so they can be tested without the shell.
 
