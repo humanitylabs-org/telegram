@@ -278,10 +278,7 @@ function start() {
     // device's Chats routing. Tap = mark read there, then open it the way Chats does (or the item's app).
     notes: NOTES,
     features: {},
-    // Ready sweep: save the Ready list the owner sees, then open a new chat that works through it.
-    sweep: rows => startSweep(rows),
-    sweepBusy: () => sweeping,
-    // Catch me up (switch catch-me-up): save Ready chats + unread notifications, then start a chat that covers every app
+    // Catch me up (telegram#7): save Ready chats + unread notifications, then start a chat that covers every app
     // in the background. The pill spins while that chat runs; it lands in Ready when the overview is done.
     catchup: rows => startCatchup(rows),
     catchupBusy: () => catching || catchupRunning(lastCatchup(), lastCatchupSession()),
@@ -289,25 +286,8 @@ function start() {
     // extra (the shell clears it when the window closes or reloads), so the Ready tab is the source of truth.
     onCounts: c => { const n = c.ready | 0; const b = window.WizardApp?.badge; if (n === lastBadge || typeof b?.set !== 'function') return; try { b.set(n); lastBadge = n; } catch (_) {} },
   };
-  let sweeping = false, lastBadge = -1;
-  // One tap = one sweep: taps while it starts are ignored, and a tap within 2 minutes of the last sweep reopens it.
-  async function startSweep(rows) {
-    if (sweeping || !rows?.length) return;
-    try { const last = JSON.parse(localStorage.getItem('tg.lastSweep') || 'null'); if (last && Date.now() - last.at < 120000 && LIVE.session(last.id) && !LIVE.session(last.id).archived) { open(last.id); return; } } catch (_) {}
-    sweeping = true; instance?.update?.();
-    try {
-      const items = rows.map(s => ({ id: s.id, title: s.title, status: s.status, state: s.attention?.state, ask: s.attention?.ask,
-        preview: s.preview, time: s.lastAssistantAt || s.updatedAt || '', unread: !!LIVE.isNew?.(s) }));
-      const r = await fetch('api/sweep', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
-      const sw = await r.json().catch(() => ({}));
-      if (!r.ok || !sw.sweep_id) throw new Error(sw.error || 'Could not start the sweep');
-      const n = sw.count, text = `\u{1F9F9} Sweep my Ready list: ${n} chat${n === 1 ? '' : 's'} (${sw.sweep_id})`;
-      const out = await LIVE.send(text, { instructions: `Ready sweep from the TG style app. Load the tg-style skill and follow its Ready sweep section. Get the chats with the tg-style app's sweep_list tool (mcp__wizard__tg_style__sweep_list), sweep_id ${sw.sweep_id}.` });
-      try { localStorage.setItem('tg.lastSweep', JSON.stringify({ id: out.sessionId, at: Date.now() })); } catch (_) {}
-      open(out.sessionId);
-    } catch (e) { showErr(e.message || 'Could not start the sweep'); }
-    finally { sweeping = false; instance?.update?.(); }
-  }
+  let lastBadge = -1;
+  try { localStorage.removeItem('tg.lastSweep'); } catch (_) {}   // the old Ready sweep's state (telegram#7 replaced it)
   let catching = false;
   const lastCatchup = () => { try { return JSON.parse(localStorage.getItem('tg.lastCatchup') || 'null'); } catch (_) { return null; } };
   const lastCatchupSession = () => { const l = lastCatchup(); try { return l?.id ? LIVE.session(l.id) || null : null; } catch (_) { return null; } };
@@ -358,7 +338,6 @@ function start() {
   }
   fetch('api/features', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.ok ? r.json() : {}).then(f => {
     host.features = f || {};
-    if (f?.['catch-me-up']) instance?.update?.();
   }).catch(() => {});
   // The shell's AI fuel gauge at the foot of the list (telegram#54, web/tg-fuel.js).
   host.fuel = fuelHost(P, document);
@@ -1222,8 +1201,8 @@ function start() {
     const folded = new Set();
     for (let i = 0; i < msgs.length; i++) if (msgs[i].role === 'assistant' && msgs[i + 1]?.role === 'assistant') folded.add(i);
     let foldOpen = false;
-    // Switch catch-me-up: a catch-up chat shows every reply expanded (wizard-os#758).
-    const fullReplies = host.features?.['catch-me-up'] === true && isCatchupChat(msgs);
+    // A catch-up chat shows every reply expanded (wizard-os#758).
+    const fullReplies = isCatchupChat(msgs);
     for (let i = 0; i < msgs.length; i++) {
       const m = msgs[i];
       if (folded.has(i) && !folded.has(i - 1)) { let n = 0; while (folded.has(i + n)) n++; body += `<details class="tg-fold"><summary><span>${n} in-between ${n === 1 ? 'message' : 'messages'}</span></summary>`; foldOpen = true; }

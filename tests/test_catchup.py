@@ -36,10 +36,23 @@ class CatchupTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_switch_listed_off_with_issue(self):
-        sw = {s['id']: s for s in self.srv.switches_doc()['switches']}
-        self.assertFalse(sw['catch-me-up']['on'])
-        self.assertEqual(sw['catch-me-up']['issues'], ['humanitylabs-org/telegram#7', 'humanitylabs-org/wizard-os#758', 'humanitylabs-org/wizard-os#795'])
+    def test_catch_me_up_is_always_on_and_its_switch_cleared(self):
+        # telegram#7 approved (switch-default): no switch any more, and an old stored value is dropped.
+        ids = {s['id'] for s in self.srv.switches_doc()['switches']}
+        self.assertNotIn('catch-me-up', ids)
+        f = Path(self.tmp.name) / 'switches.json'
+        f.write_text(json.dumps({'catch-me-up': True, 'app-popups': True}))
+        self.srv.clear_retired_switches()
+        self.assertEqual(json.loads(f.read_text()), {'app-popups': True})
+
+    def test_ready_sweep_is_gone(self):
+        # Catch me up replaced the Ready-only Sweep for everyone (telegram#7): no sweep tool, no sweep route.
+        self.assertNotIn('sweep_list', {t['name'] for t in self.srv.TOOLS})
+        self.assertFalse(hasattr(self.srv, 'save_sweep'))
+        skill = (Path(__file__).resolve().parent.parent / 'skill' / 'SKILL.md').read_text()
+        self.assertNotIn('## Ready sweep', skill)
+        self.assertNotIn('catch-me-up', skill)
+        self.assertIn('GET /api/sessions/<id>/messages?order=latest&limit=8', skill[skill.index('## Catch me up'):])
 
     def test_app_popups_switch_listed_off_with_issue(self):
         # wizard-os#796: app links in a chat open as a pop-up over TG style, off by default.
@@ -51,25 +64,25 @@ class CatchupTest(unittest.TestCase):
         # telegram#54 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('fuel-gauge', {s['id'] for s in self.srv.switches_doc()['switches']})
         f = Path(self.tmp.name) / 'switches.json'
-        f.write_text(json.dumps({'fuel-gauge': False, 'catch-me-up': True}))
+        f.write_text(json.dumps({'fuel-gauge': False, 'app-popups': True}))
         self.srv.clear_retired_switches()
-        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+        self.assertEqual(json.loads(f.read_text()), {'app-popups': True})
 
     def test_newest_preview_is_always_on_and_its_switch_cleared(self):
         # telegram#1 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('newest-preview', {s['id'] for s in self.srv.switches_doc()['switches']})
         f = Path(self.tmp.name) / 'switches.json'
-        f.write_text(json.dumps({'newest-preview': False, 'catch-me-up': True}))
+        f.write_text(json.dumps({'newest-preview': False, 'app-popups': True}))
         self.srv.clear_retired_switches()
-        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+        self.assertEqual(json.loads(f.read_text()), {'app-popups': True})
 
     def test_numbered_models_is_always_on_and_its_switch_cleared(self):
         # telegram#13 approved: no switch any more, and an old stored value is dropped.
         self.assertNotIn('numbered-models', {s['id'] for s in self.srv.switches_doc()['switches']})
         f = Path(self.tmp.name) / 'switches.json'
-        f.write_text(json.dumps({'numbered-models': True, 'catch-me-up': True}))
+        f.write_text(json.dumps({'numbered-models': True, 'app-popups': True}))
         self.srv.clear_retired_switches()
-        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+        self.assertEqual(json.loads(f.read_text()), {'app-popups': True})
 
     def test_ready_total_and_sweep_are_always_on_and_their_switches_cleared(self):
         # telegram#5 approved: no switches any more, and old stored values are dropped.
@@ -77,9 +90,9 @@ class CatchupTest(unittest.TestCase):
         self.assertNotIn('ready-total', ids)
         self.assertNotIn('ready-sweep', ids)
         f = Path(self.tmp.name) / 'switches.json'
-        f.write_text(json.dumps({'ready-total': False, 'ready-sweep': True, 'catch-me-up': True}))
+        f.write_text(json.dumps({'ready-total': False, 'ready-sweep': True, 'app-popups': True}))
         self.srv.clear_retired_switches()
-        self.assertEqual(json.loads(f.read_text()), {'catch-me-up': True})
+        self.assertEqual(json.loads(f.read_text()), {'app-popups': True})
 
     def test_tools_listed(self):
         names = {t['name'] for t in self.srv.TOOLS}
@@ -144,7 +157,7 @@ class CatchupTest(unittest.TestCase):
                              'params': {'name': 'catchup_record', 'arguments': {'catchup_id': 'cu_20260101_000000_abcdef'}}})
         self.assertTrue('error' in gone or gone.get('result', {}).get('isError'))   # the tool is gone
 
-    def test_http_route_follows_switch(self):
+    def test_http_route_is_always_on(self):
         httpd = ThreadingHTTPServer(('127.0.0.1', 0), self.srv.Handler)
         port = httpd.server_address[1]
         self.srv.TRUSTED_HOSTS.add(f'127.0.0.1:{port}')
@@ -158,13 +171,18 @@ class CatchupTest(unittest.TestCase):
                         return r.status, json.loads(r.read())
                 except urllib.error.HTTPError as e:
                     return e.code, json.loads(e.read())
-            self.assertEqual(post()[0], 404)
-            (Path(self.tmp.name) / 'switches.json').write_text(json.dumps({'catch-me-up': True}))
-            code, body = post()
+            code, body = post()   # on for everyone: no switch to turn on first
             self.assertEqual(code, 201)
             self.assertTrue(body['catchup_id'].startswith('cu_'))
+            (Path(self.tmp.name) / 'switches.json').write_text(json.dumps({'catch-me-up': False}))
+            self.assertEqual(post()[0], 201)   # an old stored off value changes nothing
+            req = urllib.request.Request(f'http://127.0.0.1:{port}/api/sweep', data=b'{"items": [{"id": "x"}]}',
+                                         headers={'Content-Type': 'application/json'}, method='POST')
+            with self.assertRaises(urllib.error.HTTPError) as gone:
+                urllib.request.urlopen(req)
+            self.assertEqual(gone.exception.code, 404)
             with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/features') as r:
-                self.assertTrue(json.loads(r.read())['catch-me-up'])
+                self.assertNotIn('catch-me-up', json.loads(r.read()))
         finally:
             httpd.shutdown()
 

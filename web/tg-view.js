@@ -43,13 +43,10 @@ const CSS = `
 .tg-sweep { flex: none; height: 32px; padding: 0 12px 0 9px; border-radius: 16px; display: flex; align-items: center; gap: 5px; border: 0; cursor: pointer; background: var(--tg-hover); color: var(--tg-primary); font: inherit; font-size: 14px; font-weight: 600; }
 .tg-sweep svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tg-sweep:hover { filter: brightness(1.15); }
-/* Tapped: the broom sweeps back and forth and a shimmer runs across until the sweep chat opens (Miguel, 19 Nov 2026). */
 .tg-sweep.busy { cursor: progress; background: linear-gradient(90deg, var(--tg-hover) 0%, color-mix(in srgb, var(--tg-primary) 28%, var(--tg-hover)) 50%, var(--tg-hover) 100%) 0 0 / 200% 100%; animation: tg-shimmer 1.1s linear infinite; }
-.tg-sweep.busy svg { transform-origin: 70% 30%; animation: tg-broom .45s ease-in-out infinite alternate; }
 @keyframes tg-shimmer { to { background-position: -200% 0; } }
-@keyframes tg-broom { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
-@media (prefers-reduced-motion: reduce) { .tg-sweep.busy, .tg-sweep.busy svg { animation: none; } .tg-sweep.busy { opacity: .7; } }
-/* Catch me up (switch catch-me-up): the same pill with a sparkle; while the catch-up chat runs the sparkle twinkles
+@media (prefers-reduced-motion: reduce) { .tg-sweep.busy { animation: none; opacity: .7; } }
+/* Catch me up (telegram#7): a pill with a sparkle; a shimmer runs across it while busy; while the catch-up chat runs the sparkle twinkles
    and a small spinner turns next to the label (Miguel, 20 Nov 2026). */
 .tg-sweep.busy.tg-catchup svg { transform-origin: 50% 50%; animation: tg-twinkle .6s ease-in-out infinite alternate; }
 .tg-catchup .tg-spin { width: 14px; height: 14px; margin-left: 3px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tg-spin .8s linear infinite; }
@@ -194,7 +191,6 @@ const ICON = {
   archive: ['M4 7h16v3H4z', 'M5 10v9h14v-9', 'M10 14h4'],
   back: ['M15 5l-7 7 7 7'],
   tick2: ['M2 13l4 4 8-9', 'M10 15l2 2 8-9'],
-  sweep: ['M20 4l-7.5 7.5', 'M10.5 10l3.5 3.5c-.8 3.4-3.2 6-6.5 7.5L3 20l1-4.5C5.5 12.2 7.6 10.4 10.5 10z', 'M7 15.5l2 2'],
   sparkle: ['M10 3l1.8 5.2L17 10l-5.2 1.8L10 17l-1.8-5.2L3 10l5.2-1.8z', 'M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z', 'M18 3v3', 'M16.5 4.5h3'],
 };
 function theme() {
@@ -305,7 +301,7 @@ export default {
     function list() {
       const c = counts(), noteMode = folder === 'notes' && !inArchive && !query.trim();
       const rows = noteMode ? [] : pick(), nts = noteMode ? notes() : [];
-      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, !!host.sweepBusy?.(), !!host.catchupBusy?.(), nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), JSON.stringify(host.rowInfo(s))]), c]);
+      const next = JSON.stringify([folder, query, inArchive, el.dataset.tgTheme, host.features || {}, !!host.catchupBusy?.(), nts.map(i => [i.id, i.read, i.title, i.time]), rows.map(s => [s.id, s.title, s.status, s.preview, s.attention?.state, s.attention?.ask, host.isUnread(s), stamp(host, s), JSON.stringify(host.rowInfo(s))]), c]);
       host.onCounts?.(c);
       if (next === sig && el.querySelector('.tg-list')) return;
       sig = next;
@@ -318,20 +314,14 @@ export default {
       } else {
         const h = host.element('h1'); h.textContent = 'Wizard Chats'; top.append(h);
         // Archive lives in the header, like Telegram's "Move to main menu": one quiet button, no count.
-        // Sweep: one tap opens a chat that works through the whole Ready list in chunks (Miguel, 19 Nov 2026).
-        // Switch catch-me-up: Sweep becomes Catch me up, shown even when Ready is empty (other apps may still wait on him).
-        if (host.features?.['catch-me-up'] && host.catchup && folder === 'ready' && !query.trim()) {
+        // Catch me up (telegram#7): shown even when Ready is empty (other apps may still wait on him).
+        if (host.catchup && folder === 'ready' && !query.trim()) {
           const cu = host.element('button'), busy = !!host.catchupBusy?.(); cu.type = 'button'; cu.className = 'tg-sweep tg-catchup' + (busy ? ' busy' : ''); cu.dataset.tgCatchup = '';
           cu.disabled = busy; cu.setAttribute('aria-busy', String(busy));
           cu.title = busy ? 'Your catch-up is running; it lands in Ready when it is done' : 'Everything waiting on you across your apps, fresh each time';
           cu.append(svg(host, ICON.sparkle), busy ? 'Catching up…' : 'Catch me up');
           if (busy) { const sp = host.element('span'); sp.className = 'tg-spin'; sp.setAttribute('aria-hidden', 'true'); cu.append(sp); }
           top.append(cu);
-        } else if (host.sweep && folder === 'ready' && !query.trim() && rows.length) {
-          const sw = host.element('button'), busy = !!host.sweepBusy?.(); sw.type = 'button'; sw.className = 'tg-sweep' + (busy ? ' busy' : ''); sw.dataset.tgSweep = '';
-          sw.disabled = busy; sw.setAttribute('aria-busy', String(busy));
-          sw.title = busy ? 'Starting your sweep…' : `Work through all ${rows.length} Ready chats with your agent`;
-          sw.append(svg(host, ICON.sweep), busy ? 'Sweeping…' : 'Sweep'); top.append(sw);
         }
         if (c.archive) { const ab = host.element('button'); ab.type = 'button'; ab.className = 'tg-ibtn'; ab.dataset.tgArchive = ''; ab.title = 'Archived Chats'; ab.setAttribute('aria-label', 'Archived Chats'); ab.append(svg(host, ICON.archive)); top.append(ab); }
       }
@@ -400,7 +390,6 @@ export default {
 
     host.listen('click', e => {
       if (e.target.closest('[data-tg-catchup]')) { e.preventDefault(); e.stopImmediatePropagation(); host.catchup?.(pick()); return; }
-      if (e.target.closest('[data-tg-sweep]')) { e.preventDefault(); e.stopImmediatePropagation(); host.sweep?.(pick()); return; }
       const f = e.target.closest('[data-tg-folder]');
       if (f) { folder = f.dataset.tgFolder; list(); return; }
       const n = e.target.closest('[data-tg-note]'); if (n) { host.notes?.open?.(n.dataset.tgNote); return; }
